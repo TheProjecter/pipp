@@ -39,7 +39,7 @@ def pipp_file(context, file_name):
   file_name = Conversions.StringValue(file_name)
   file_names = glob.glob(abs_in_path(context.processor, file_name))
   if len(file_names) == 0:
-    raise Exception('No files found')
+    raise Exception('No files found: ' + file_name)
   for in_name in file_names:
     out_name = abs_out_path(context.processor, in_name)
     if not files.has_key(in_name):
