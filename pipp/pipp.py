@@ -9,9 +9,12 @@ from Ft.Xml.Domlette import NonvalidatingReader
 from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Lib.Uri import OsPathToUri
 from Ft.Xml.XPath import Compile, Conversions
-from pipp_utils import *
 import re, os, sys
+from pipp_utils import *
 
+#--
+# Class to hold Pipp processing state
+#--
 class PippContext(object):
     
     def __init__(self, in_root, out_root, state_xml, state_doc):
@@ -19,6 +22,38 @@ class PippContext(object):
         self.out_root = out_root
         self.state_xml = state_xml
         self.state_doc = state_doc
+
+    #--
+    # Given a pipp path, return the absolute path in the input tree. If the path
+    # is relative, it is relative to the current file. If it is absolute then the
+    # in-root is prepended.
+    #--
+    def abs_in_path(self, file_name):
+        if file_name[0] == '/':
+            return self.in_root + file_name
+        else:
+            return os.path.dirname(self.in_root + self.file_name) + '/' + file_name
+
+    #--
+    # Given an absolute input path, return the absolute output path. If the output
+    # directories do not exist then this function will create them.
+    #--
+    def abs_out_path(self, in_path):
+        abs_output_file = self.out_root + in_path[len(self.in_root):]
+        if not os.path.isdir(os.path.dirname(abs_output_file)):
+            os.makedirs(os.path.dirname(abs_output_file))
+        return abs_output_file
+
+    #--
+    # Add a dependency
+    #--
+    def add_depends(self, file_name):
+        for node in self.depends_node.childNodes:
+            if file_name == get_text(node):
+                return
+        new_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'depend')
+        new_node.appendChild(self.state_doc.createTextNode(file_name))
+        self.depends_node.appendChild(new_node)
 
 
 #--
@@ -71,12 +106,12 @@ def build_project(project, full=False):
     else:
         for page in state_doc.xpath('//page'):                
             src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
-            in_path = abs_in_path(ctx, src)
-            out_path = re.sub('\.pip$', '.html', abs_out_path(ctx, in_path))        
+            in_path = ctx.abs_in_path(src)
+            out_path = re.sub('\.pip$', '.html', ctx.abs_out_path(in_path))        
             build_time = os.stat(out_path).st_mtime
 
             deps = [src] + [get_text(x) for x in page.xpath('depends/depend')]
-            if any(os.stat(abs_in_path(ctx, d)).st_mtime > build_time for d in deps):
+            if any(os.stat(ctx.abs_in_path(d)).st_mtime > build_time for d in deps):
 
                 #--
                 # If any dependent files have a newer modification time than the target, rebuild
@@ -139,13 +174,13 @@ def build_file(processor, state_node, do_children=False):
     try:
         output = processor.run(input)
     except Exception, e:
-        print 'Error: exception occured while processing %s:\n%s' % (ctr.file_name, e)
+        print 'Error: exception occured while processing %s:\n%s' % (ctx.file_name, e)
         sys.exit(1)
 
     #--
     # Determine the output file name and write output to it
     #--
-    abs_output_file = abs_out_path(ctx, abs_in_path(ctx, ctx.out_file))
+    abs_output_file = ctx.abs_out_path(ctx.abs_in_path(ctx.out_file))
     output_fh = open(abs_output_file, 'w')
     output_fh.write(output)
     output_fh.close()

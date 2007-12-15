@@ -23,7 +23,7 @@ files = {}
 #--
 def pipp_child(context, file_name):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-    file_name = abs_in_path(ctx, Conversions.StringValue(file_name)) \
+    file_name = ctx.abs_in_path(Conversions.StringValue(file_name)) \
                                 [len(ctx.in_root):]
     new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
     new_node.setAttributeNS(EMPTY_NAMESPACE, 'src', file_name)
@@ -37,12 +37,12 @@ def pipp_child(context, file_name):
 def pipp_file(context, file_name):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     file_name = Conversions.StringValue(file_name)
-    file_names = glob.glob(abs_in_path(ctx, file_name))
+    file_names = glob.glob(ctx.abs_in_path(file_name))
     if len(file_names) == 0:
         raise Exception('No files found: ' + file_name)
     for in_name in file_names:
-        add_depends(ctx, in_name[len(ctx.in_root):])
-        out_name = abs_out_path(ctx, in_name)
+        ctx.add_depends(in_name[len(ctx.in_root):])
+        out_name = ctx.abs_out_path(in_name)
         if not files.has_key(in_name):
             out_fh = open(out_name, 'wb')
             out_fh.write(open(in_name, 'rb').read())
@@ -63,8 +63,8 @@ def pipp_child_file(context, src, title):
     if in_name.startswith('http'):
         link_name = in_name
     else:
-        in_name = abs_in_path(ctx, in_name)
-        out_name = abs_out_path(ctx, in_name)
+        in_name = ctx.abs_in_path(in_name)
+        out_name = ctx.abs_out_path(in_name)
         link_name = out_name[len(ctx.out_root):]
         if not files.has_key(in_name):
             out_fh = open(out_name, 'wb')
@@ -141,7 +141,7 @@ def pipp_map_view(context, xslt_file):
     #--
     # Create the XSLT processor object. For efficiency there is a cache of these.
     #--
-    xslt_file = abs_in_path(ctx, Conversions.StringValue(xslt_file))
+    xslt_file = ctx.abs_in_path(Conversions.StringValue(xslt_file))
     if not processors.has_key(xslt_file):
         processors[xslt_file]= Processor.Processor()
         processors[xslt_file].registerExtensionModules(['pipp_xslt'])
@@ -196,8 +196,8 @@ def pipp_relative_path(context, link):
 #--
 def pipp_code(context, src):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-    abs_src = abs_in_path(ctx, Conversions.StringValue(src))
-    add_depends(ctx, abs_src[len(ctx.in_root):])
+    abs_src = ctx.abs_in_path(Conversions.StringValue(src))
+    ctx.add_depends(abs_src[len(ctx.in_root):])
 
     code2html_cmd = '%s/code2html -o html-css %s' % (pipp_dir, abs_src)
     if os.name == 'nt':
@@ -218,14 +218,14 @@ def pipp_code(context, src):
 #--
 def pipp_image_width(context, src):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-    image_name = abs_in_path(ctx, Conversions.StringValue(src))
+    image_name = ctx.abs_in_path(Conversions.StringValue(src))
     if not images.has_key(image_name):
         images[image_name] = Image.open(image_name)
     return images[image_name].size[0]
 
 def pipp_image_height(context, src):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-    image_name = abs_in_path(ctx, Conversions.StringValue(src))
+    image_name = ctx.abs_in_path(Conversions.StringValue(src))
     if not images.has_key(image_name):
         images[image_name] = Image.open(image_name)
     return images[image_name].size[1]
@@ -235,8 +235,8 @@ def pipp_image_height(context, src):
 #--
 def pipp_thumbnail(context, src, width, height):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-    image_name = abs_in_path(ctx, Conversions.StringValue(src))
-    add_depends(ctx, image_name[len(ctx.in_root):])
+    image_name = ctx.abs_in_path(Conversions.StringValue(src))
+    ctx.add_depends(image_name[len(ctx.in_root):])
     thumb_name = re.sub('(\.\w+)$', '_thumb\g<1>', Conversions.StringValue(src))
     
     if width:
@@ -253,12 +253,12 @@ def pipp_thumbnail(context, src, width, height):
         height = int(h * width / w)    
     
     img = img.resize((width, height))
-    img.save(abs_out_path(ctx, abs_in_path(ctx, thumb_name)))
+    img.save(ctx.abs_out_path(ctx.abs_in_path(thumb_name)))
 
     #--
     # Add image to cache using fake inroot name, so width/height functions work
     #--
-    images[abs_in_path(ctx, thumb_name)] = img
+    images[ctx.abs_in_path(thumb_name)] = img
 
     return thumb_name
 
@@ -274,19 +274,19 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
     #--
     # Technical dependencies; not really important. Not activating for the time being.
     #--
-    #add_depends(ctx, Conversions.StringValue(font))
-    #add_depends(ctx, Conversions.StringValue(texture))
+    #ctx.add_depends(Conversions.StringValue(font))
+    #ctx.add_depends(Conversions.StringValue(texture))
 
     #--
     # Convert the XSLT parameters into regular python types
     #--
-    font = abs_in_path(ctx, Conversions.StringValue(font))
+    font = ctx.abs_in_path(Conversions.StringValue(font))
     height = int(Conversions.NumberValue(height))
-    texture = abs_in_path(ctx, Conversions.StringValue(texture))
+    texture = ctx.abs_in_path(Conversions.StringValue(texture))
     bgcolor = int(Conversions.StringValue(bgcolor)[1:], 16)
     text = Conversions.StringValue(text)
     file_name = re.sub('[^a-zA-Z0-9]', '_', text) + '.png'
-    pseudo_in_name = abs_in_path(ctx, file_name)
+    pseudo_in_name = ctx.abs_in_path(file_name)
 
     # Avoid unwanted cropping on the left
     text = '    ' + text
@@ -315,7 +315,7 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
     out = Image.new('RGBA', text_mask.size, bgcolor)
     out.paste(background, (0, 0), text_mask)
     out = out.convert('P')    
-    out.save(abs_out_path(ctx, pseudo_in_name), transparency=0)
+    out.save(ctx.abs_out_path(pseudo_in_name), transparency=0)
 
     #--
     # Add image to cache using fake inroot name, so width/height functions work
