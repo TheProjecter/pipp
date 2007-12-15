@@ -61,8 +61,10 @@ class PippContext(object):
         #--
         # If state has changed, do a full rebuild
         #--
-        if open(self.state_xml).read() != self.orig_state:
+        new_state = open(self.state_xml).read()
+        if new_state != self.orig_state:
             build_project_full(self.project)
+            self.orig_state = new_state
 
     #--
     # Given a pipp path, return the absolute path in the input tree. If the path
