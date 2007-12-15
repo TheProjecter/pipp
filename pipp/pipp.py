@@ -17,18 +17,18 @@ from pipp_utils import *
 #--
 class PippContext(object):
     
-    def __init__(self, project, full):
+    def __init__(self, in_root, full):
 
         #--
         # Parse the project definition
         #--
-        self.project = project
-        self.project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
-        self.in_root = self.project_doc.xpath('string(/project/in-root)')
-        self.out_root = self.project_doc.xpath('string(/project/out-root)')
-        self.index = self.project_doc.xpath('string(/project/index)')
-        self.stylesheet_fname = self.project_doc.xpath('string(/project/stylesheet)')
-        self.state_xml = self.project_doc.xpath('string(/project/state)')
+        self.in_root = in_root.rstrip('\\.') # TBD!!!!
+        self.out_root = os.path.join(self.in_root, 'out')
+        self.index = '/index.pip'
+        self.stylesheet_fname = '/pipp.xsl'
+        self.state_xml = os.path.join(in_root, 'pipp.xml')
+        if not os.path.exists(self.state_xml):
+            open(self.state_xml, 'w').write('<page src=""/>')
         self.orig_state = open(self.state_xml).read()
 
         #--
@@ -63,7 +63,7 @@ class PippContext(object):
         #--
         new_state = open(self.state_xml).read()
         if new_state != self.orig_state:
-            build_project_full(self.project)
+            build_project_full(self.in_root)
             self.orig_state = new_state
 
     #--
@@ -102,8 +102,8 @@ class PippContext(object):
 #--
 # Full build of a project. Process the index page and recurse.
 #--
-def build_project_full(project):
-    ctx = PippContext(project, True)
+def build_project_full(in_root):
+    ctx = PippContext(in_root, True)
     processor = ctx.create_processor()    
     state_node = ctx.state_doc.documentElement
     state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', ctx.index)
@@ -113,8 +113,8 @@ def build_project_full(project):
 #--
 # Partial rebuild of a project. Check pages in state XML for modified files.
 #--
-def build_project(project):
-    ctx = PippContext(project, False)
+def build_project(in_root):
+    ctx = PippContext(in_root, False)
     processor = ctx.create_processor()    
 
     for page in ctx.state_doc.xpath('//page'):                
@@ -138,8 +138,8 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
                 self.server.node_map[self.path] = state_node
         SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
-def serve_project(project):
-    ctx = PippContext(project, False)
+def serve_project(in_root):
+    ctx = PippContext(in_root, False)
     os.chdir(ctx.out_root)
     
     node_map = {}
@@ -236,64 +236,15 @@ def build_file(processor, state_node, do_children=False):
 #--
 # Main entry point - parse the command line
 #--
-
-#--
-# If -c is specified, create the project file and an initial empty state file
-#--
-if len(sys.argv) == 7 and sys.argv[1] == '-c':
-    (project, in_root, stylesheet, index, out_root) = sys.argv[2:]
-
-    #--
-    # Sanitise input
-    #--
-    if in_root[-1:] == '/': in_root = in_root[:-1]
-    if out_root[-1:] == '/': out_root = out_root[:-1]
-    if index[0:1] != '/': index = '/' + index
-    if stylesheet[0:1] != '/': stylesheet = '/' + stylesheet
-    state_fname = os.path.join(project_dir, '%s-state.xml' % project)
-
-    #--
-    # Check the project doesn't already exist
-    #--
-    project_fname = os.path.join(project_dir, '%s.xml' % project)
-    if os.path.exists(project_fname):
-        print 'Error: Project already exists'
-        sys.exit(1)
-
-    #--
-    # Create the project file and empty state XML
-    #--
-    project_file = open(project_fname, 'w')
-    project_file.write("""<project>
-    <in-root>%s</in-root>
-    <stylesheet>%s</stylesheet>
-    <index>%s</index>
-    <out-root>%s</out-root>
-    <state>%s</state>
-</project>""" % (in_root, stylesheet, index, out_root, state_fname))
-    project_file.close()
-
-    state_file = open(state_fname, 'w')
-    state_file.write("<page/>")
-    state_file.close()
-
-    #--
-    # Build the project
-    #--
-    build_project(project_fname)
-
-#--
-# If just a project name is specified, build it
-#--
-elif len(sys.argv) == 2:
-    project_fname = '%s/%s.xml' % (project_dir, sys.argv[1])
-    build_project(project_fname)
+if len(sys.argv) == 2:
+    in_root = os.path.join(os.getcwd(), sys.argv[1])
+    build_project(in_root)
 elif len(sys.argv) == 3 and sys.argv[1] == '-f':
-    project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
-    build_project_full(project_fname)
+    in_root = os.path.join(os.getcwd(), sys.argv[2])
+    build_project_full(in_root)
 elif len(sys.argv) == 3 and sys.argv[1] == '-s':
-    project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
-    serve_project(project_fname)
+    in_root = os.path.join(os.getcwd(), sys.argv[2])
+    serve_project(in_root)
 
 
 #--
@@ -304,8 +255,7 @@ else:
 Pipp - Python Internet Pre-Processor
 Copyright 2004-2007 Paul Johnston, distributed under the BSD license
 
-Initial usage: %s -c <project> <in-root> <stylesheet> <index> <out-root>
-Further usage: %s <project>
+Usage: %s [-f] [-s] [path]
 
 For full details, please read the documentation.
 """ % (sys.argv[0], sys.argv[0])
