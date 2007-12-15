@@ -17,11 +17,52 @@ from pipp_utils import *
 #--
 class PippContext(object):
     
-    def __init__(self, in_root, out_root, state_xml, state_doc):
-        self.in_root = in_root
-        self.out_root = out_root
-        self.state_xml = state_xml
-        self.state_doc = state_doc
+    def __init__(self, project, full):
+
+        #--
+        # Parse the project definition
+        #--
+        self.project = project
+        self.project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
+        self.in_root = self.project_doc.xpath('string(/project/in-root)')
+        self.out_root = self.project_doc.xpath('string(/project/out-root)')
+        self.index = self.project_doc.xpath('string(/project/index)')
+        self.stylesheet_fname = self.project_doc.xpath('string(/project/stylesheet)')
+        self.state_xml = self.project_doc.xpath('string(/project/state)')
+        self.orig_state = open(self.state_xml).read()
+
+        #--
+        # Create the DOM for the state document
+        #--
+        if full:
+            self.state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
+        else:
+            self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
+
+    #--
+    # Create the XSLT processor
+    #--
+    def create_processor(self):
+        processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
+        processor.registerExtensionModules(['pipp_xslt'])
+        stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(self.in_root + self.stylesheet_fname))
+        processor.appendStylesheet(stylesheet)
+        processor.extensionParams[(NAMESPACE, 'context')] = self
+        return processor
+
+    #--
+    # Write the state DOM over the previous state XML
+    #--
+    def write_state(self):
+        state_file = open(self.state_xml, 'w')
+        PrettyPrint(self.state_doc.documentElement, state_file)
+        state_file.close()
+
+        #--
+        # If state has changed, do a full rebuild
+        #--
+        if open(self.state_xml).read() != self.orig_state:
+            build_project_full(self.project)
 
     #--
     # Given a pipp path, return the absolute path in the input tree. If the path
@@ -57,97 +98,91 @@ class PippContext(object):
 
 
 #--
-# Build a project - read the project file and run the XSLT processor on the
-# index page.
+# Full build of a project. Process the index page and recurse.
 #--
-def build_project(project, full=False):
+def build_project_full(project):
+    ctx = PippContext(project, True)
+    processor = ctx.create_processor()    
+    state_node = ctx.state_doc.documentElement
+    state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', ctx.index)
+    build_file(processor, state_node, do_children=True)
+    ctx.write_state()
 
-    #--
-    # Parse the project definition
-    #--
-    project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
-    in_root = project_doc.xpath('string(/project/in-root)')
-    out_root = project_doc.xpath('string(/project/out-root)')
-    index = project_doc.xpath('string(/project/index)')
-    stylesheet_fname = project_doc.xpath('string(/project/stylesheet)')
-    state_xml = project_doc.xpath('string(/project/state)')
-    orig_state = open(state_xml).read()
+#--
+# Partial rebuild of a project. Check pages in state XML for modified files.
+#--
+def build_project(project):
+    ctx = PippContext(project, False)
+    processor = ctx.create_processor()    
 
-    #--
-    # Create the DOM for the state document
-    #--
-    if full:
-        state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
-    else:
-        state_doc = NonvalidatingReader.parseUri(OsPathToUri(state_xml))
+    for page in ctx.state_doc.xpath('//page'):                
+        src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
+        in_path = ctx.abs_in_path(src)
+        out_path = re.sub('\.pip$', '.html', ctx.abs_out_path(in_path))        
+        cond_build_file(ctx, page, out_path, processor)
+
+    ctx.write_state()
+
+#--
+# Run as a webserver that outputs the selected project, rebuilding output
+# files on demand.
+#--
+class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
+    def do_GET(self):      
+        if self.server.node_map.has_key(self.path):
+            state_node = cond_build_file(self.server.ctx, self.server.node_map[self.path], self.server.ctx.out_root + self.path, self.server.processor)
+            if state_node:
+                self.server.ctx.write_state()
+                self.server.node_map[self.path] = state_node
+        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+
+def serve_project(project):
+    ctx = PippContext(project, False)
+    os.chdir(ctx.out_root)
     
-    #--
-    # Create the XSLT processor
-    #--
-    processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
-    processor.registerExtensionModules(['pipp_xslt'])
-    stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(in_root + stylesheet_fname))
-    processor.appendStylesheet(stylesheet)
-
-    ctx = PippContext(in_root, out_root, state_xml, state_doc)
-    processor.extensionParams[(NAMESPACE, 'context')] = ctx
-
-    #--
-    # Process the index file. This will recursively process all its children.
-    #--
-    if full:
-        state_node = state_doc.documentElement
-        state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', index)
-        build_file(processor, state_node, do_children=True)
-
-    #--
-    # Go through all pages in state xml
-    #--
-    else:
-        for page in state_doc.xpath('//page'):                
-            src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
-            in_path = ctx.abs_in_path(src)
-            out_path = re.sub('\.pip$', '.html', ctx.abs_out_path(in_path))        
-            build_time = os.stat(out_path).st_mtime
-
-            deps = [src] + [get_text(x) for x in page.xpath('depends/depend')]
-            if any(os.stat(ctx.abs_in_path(d)).st_mtime > build_time for d in deps):
-
-                #--
-                # If any dependent files have a newer modification time than the target, rebuild
-                #--
-                state_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-                state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
-                page.parentNode.insertBefore(state_node, page)
-                build_file(processor, state_node)
-                
-                #--
-                # Merge new state data into the tree
-                #--
-                cn = state_node.xpath('children')[0]
-                for x in list(cn.childNodes):
-                    cn.removeChild(x)
-                pcn = page.xpath('children')[0]
-                for x in list(pcn.childNodes):
-                    cn.appendChild(x)                
-                page.parentNode.removeChild(page)
-
-    #--
-    # Write the state DOM over the previous state XML
-    #--
-    state_file = open(state_xml, 'w')
-    PrettyPrint(state_doc.documentElement, state_file)
-    state_file.close()
-
-    #--
-    # If state has changed, do a full rebuild
-    #--
-    if open(state_xml).read() != orig_state:
-        build_project(project, full=True)
+    node_map = {}
+    for page in ctx.state_doc.xpath('//page'):                
+        src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
+        in_path = ctx.abs_in_path(src)
+        out_path = re.sub('\.pip$', '.html', ctx.abs_out_path(in_path))        
+        node_map[out_path[len(ctx.out_root):]] = page
+    
+    httpd = BaseHTTPServer.HTTPServer(('127.0.0.1', 8080), PippHTTPRequestHandler)
+    httpd.ctx = ctx
+    httpd.processor = ctx.create_processor()
+    httpd.node_map = node_map
+    httpd.serve_forever()
 
 
 #--
-# Process a .pip file, and recursively process all its children.
+# If any dependent files have a newer modification time than the target, rebuild
+#--
+def cond_build_file(ctx, page, out_path, processor):
+    build_time = os.stat(out_path).st_mtime
+    src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
+    deps = [src] + [get_text(x) for x in page.xpath('depends/depend')]
+    if any(os.stat(ctx.abs_in_path(d)).st_mtime > build_time for d in deps):
+
+        state_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+        state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
+        page.parentNode.insertBefore(state_node, page)
+        build_file(processor, state_node)
+
+        #--
+        # Merge new state data into the tree
+        #--
+        cn = state_node.xpath('children')[0]
+        for x in list(cn.childNodes):
+            cn.removeChild(x)
+        pcn = page.xpath('children')[0]
+        for x in list(pcn.childNodes):
+            cn.appendChild(x)                
+        page.parentNode.removeChild(page)
+        return state_node
+
+
+#--
+# Process a .pip file
 #--
 def build_file(processor, state_node, do_children=False):
     ctx = processor.extensionParams[(NAMESPACE, 'context')]
@@ -194,18 +229,8 @@ def build_file(processor, state_node, do_children=False):
             if not child.hasChildNodes():
                 ctx.read_state_node = child
                 build_file(processor, child, do_children=True)
-
-#--
-# Run as a webserver that outputs the selected project
-#--
-def serve_project(project):
-    project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
-    out_root = project_doc.xpath('string(/project/out-root)')
-    os.chdir(out_root)
-    httpd = BaseHTTPServer.HTTPServer(('127.0.0.1', 8080), SimpleHTTPServer.SimpleHTTPRequestHandler)
-    httpd.serve_forever()
-
-
+      
+    
 #--
 # Main entry point - parse the command line
 #--
@@ -263,7 +288,7 @@ elif len(sys.argv) == 2:
     build_project(project_fname)
 elif len(sys.argv) == 3 and sys.argv[1] == '-f':
     project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
-    build_project(project_fname, full=True)
+    build_project_full(project_fname)
 elif len(sys.argv) == 3 and sys.argv[1] == '-s':
     project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
     serve_project(project_fname)
