@@ -110,7 +110,7 @@ def rebuild_project(project):
         out_path = re.sub('\.pip$', '.html', abs_out_path(ctx, in_path))        
         build_time = os.stat(out_path).st_mtime
         
-        deps = [src] + [x.firstChild.nodeValue for x in page.xpath('depends/depend')]
+        deps = [src] + [get_text(x) for x in page.xpath('depends/depend')]
         if any(os.stat(abs_in_path(ctx, d)).st_mtime > build_time for d in deps):
         
             #--
