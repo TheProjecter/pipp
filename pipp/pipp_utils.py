@@ -3,6 +3,7 @@
 # Functions and constants common to all Pipp modules
 #--
 import os, warnings, sys, re
+from Ft.Xml import EMPTY_NAMESPACE
 
 #--
 # Configuration
@@ -49,3 +50,16 @@ def get_text(node):
         if text_node.nodeType == text_node.TEXT_NODE:
             rc = rc + text_node.data
     return rc
+
+#--
+# Add a dependency
+#--
+def add_depends(context, file_name):
+    state_doc = context.processor.extensionParams[(NAMESPACE, 'state_doc')]
+    depends_node = context.processor.extensionParams[(NAMESPACE, 'depends_node')]
+    for node in depends_node.childNodes:
+        if file_name == node.firstChild.nodeValue:
+            return
+    new_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'depend')
+    new_node.appendChild(state_doc.createTextNode(file_name))
+    depends_node.appendChild(new_node)

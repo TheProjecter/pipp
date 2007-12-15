@@ -40,7 +40,9 @@ def pipp_file(context, file_name):
     file_names = glob.glob(abs_in_path(context.processor, file_name))
     if len(file_names) == 0:
         raise Exception('No files found: ' + file_name)
+    in_root = context.processor.extensionParams[(NAMESPACE, 'in_root')]
     for in_name in file_names:
+        add_depends(context, in_name[len(in_root):])
         out_name = abs_out_path(context.processor, in_name)
         if not files.has_key(in_name):
             out_fh = open(out_name, 'wb')
@@ -149,7 +151,7 @@ def pipp_map_view(context, xslt_file):
     # Copy variables relevant to current file from pipp processor to the map view
     # processor.
     #--
-    for var in ['in_root', 'out_root', 'state_doc', 'state_node', 'file_name', 'out_file']:
+    for var in ['in_root', 'out_root', 'state_doc', 'state_node', 'file_name', 'out_file', 'depends_node']:
         processors[xslt_file].extensionParams[(NAMESPACE, var)] = context.processor.extensionParams[(NAMESPACE, var)]
 
     #--
@@ -200,6 +202,8 @@ def pipp_relative_path(context, link):
 #--
 def pipp_code(context, src):
     abs_src = abs_in_path(context.processor, Conversions.StringValue(src))
+    in_root = context.processor.extensionParams[(NAMESPACE, 'in_root')]
+    add_depends(context, abs_src[len(in_root):])
 
     code2html_cmd = '%s/code2html -o html-css %s' % (pipp_dir, abs_src)
     if os.name == 'nt':
@@ -235,6 +239,8 @@ def pipp_image_height(context, src):
 #--
 def pipp_thumbnail(context, src, width, height):
     image_name = abs_in_path(context.processor, Conversions.StringValue(src))
+    in_root = context.processor.extensionParams[(NAMESPACE, 'in_root')]
+    add_depends(context, image_name[len(in_root):])
     thumb_name = re.sub('(\.\w+)$', '_thumb\g<1>', Conversions.StringValue(src))
     
     if width:
@@ -267,6 +273,9 @@ def pipp_thumbnail(context, src, width, height):
 # The background colour must be specified for anti-aliasing to work properly.
 #--
 def pipp_gtitle(context, font, height, texture, bgcolor, text):
+    # Not that important
+    #add_depends(context, Conversions.StringValue(font))
+    #add_depends(context, Conversions.StringValue(texture))
 
     #--
     # Convert the XSLT parameters into regular python types
@@ -320,22 +329,22 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
 #--
 ExtFunctions = \
 {
-    (NAMESPACE, 'child'):                 pipp_child,
-    (NAMESPACE, 'file'):                    pipp_file,
-    (NAMESPACE, 'child-file'):        pipp_child_file,
+    (NAMESPACE, 'child'):           pipp_child,
+    (NAMESPACE, 'file'):            pipp_file,
+    (NAMESPACE, 'child-file'):      pipp_child_file,
 
-    (NAMESPACE, 'export'):                pipp_export,
-    (NAMESPACE, 'import'):                pipp_import,
+    (NAMESPACE, 'export'):          pipp_export,
+    (NAMESPACE, 'import'):          pipp_import,
     (NAMESPACE, 'import-join'):     pipp_import_join,
-    (NAMESPACE, 'map-view'):            pipp_map_view,
+    (NAMESPACE, 'map-view'):        pipp_map_view,
 
-    (NAMESPACE, 'file-name'):         pipp_file_name,
-    (NAMESPACE, 'file-time'):         pipp_file_time,
-    (NAMESPACE, 'relative-path'): pipp_relative_path,
-    (NAMESPACE, 'code'):                    pipp_code,
+    (NAMESPACE, 'file-name'):       pipp_file_name,
+    (NAMESPACE, 'file-time'):       pipp_file_time,
+    (NAMESPACE, 'relative-path'):   pipp_relative_path,
+    (NAMESPACE, 'code'):            pipp_code,
 
     (NAMESPACE, 'image-width'):     pipp_image_width,
     (NAMESPACE, 'image-height'):    pipp_image_height,
-    (NAMESPACE, 'thumbnail'):         pipp_thumbnail,
-    (NAMESPACE, 'gtitle'):                pipp_gtitle,
+    (NAMESPACE, 'thumbnail'):       pipp_thumbnail,
+    (NAMESPACE, 'gtitle'):          pipp_gtitle,
 }
