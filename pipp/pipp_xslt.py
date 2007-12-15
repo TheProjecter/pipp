@@ -104,7 +104,7 @@ def pipp_export(context, name, value):
 def pipp_import(context, name):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     name = Conversions.StringValue(name)
-    cur_doc = ctx.read_state_node
+    cur_doc = ctx.state_node
     while cur_doc:
         cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
         for node in cur_exp.childNodes:
@@ -121,7 +121,7 @@ def pipp_import(context, name):
 def pipp_import_join(context, name, join_str):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     name = Conversions.StringValue(name)
-    cur_doc = ctx.read_state_node
+    cur_doc = ctx.state_node
     values = []
     while cur_doc:
         cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]

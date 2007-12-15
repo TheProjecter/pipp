@@ -63,7 +63,6 @@ def build_project(project, full=False):
     if full:
         state_node = state_doc.documentElement
         state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', index)
-        ctx.read_state_node = state_node
         build_file(processor, state_node, do_children=True)
 
     #--
@@ -82,10 +81,11 @@ def build_project(project, full=False):
                 #--
                 # If any dependent files have a newer modification time than the target, rebuild
                 #--
-                ctx.read_state_node = page
                 state_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
                 state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
+                page.parentNode.insertBefore(state_node, page)
                 build_file(processor, state_node)
+                page.parentNode.removeChild(state_node)
 
     #--
     # Write the state DOM over the previous state XML
