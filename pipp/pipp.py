@@ -25,7 +25,7 @@ class PippContext(object):
 # Build a project - read the project file and run the XSLT processor on the
 # index page.
 #--
-def build_project(project):
+def build_project(project, full=False):
 
     #--
     # Parse the project definition
@@ -39,9 +39,13 @@ def build_project(project):
 
     #--
     # Create the DOM for the state document
+    # TBD: make this the same for full/partial
     #--
-    state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
-
+    if full:
+        state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
+    else:
+        state_doc = NonvalidatingReader.parseUri(OsPathToUri(state_xml))
+    
     #--
     # Create the XSLT processor
     #--
@@ -56,97 +60,53 @@ def build_project(project):
     #--
     # Process the index file. This will recursively process all its children.
     #--
-    state_node = state_doc.documentElement
-    state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', index)
-    ctx.read_state_node = state_node
-    build_file(processor, state_node, do_children=True)
-
-    #--
-    # Write the state DOM over the previous state XML
-    #--
-    state_file = open(state_xml, 'w')
-    PrettyPrint(state_doc.documentElement, state_file)
-    state_file.close()
-
-#--
-# Build a project - read the project file and run the XSLT processor on the
-# index page.
-#--
-def rebuild_project(project):
-
-    #--
-    # Parse the project definition
-    #--
-    project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
-    in_root = project_doc.xpath('string(/project/in-root)')
-    out_root = project_doc.xpath('string(/project/out-root)')
-    index = project_doc.xpath('string(/project/index)')
-    stylesheet_fname = project_doc.xpath('string(/project/stylesheet)')
-    state_xml = project_doc.xpath('string(/project/state)')
-
-    #--
-    # Create the DOM for the state document
-    #--
-    state_doc = NonvalidatingReader.parseUri(OsPathToUri(state_xml))
-
-    #--
-    # Create the XSLT processor
-    #--
-    processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
-    processor.registerExtensionModules(['pipp_xslt'])
-    stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(in_root + stylesheet_fname))
-    processor.appendStylesheet(stylesheet)
-
-    ctx = PippContext(in_root, out_root, state_xml, state_doc)
-    processor.extensionParams[(NAMESPACE, 'context')] = ctx
+    if full:
+        state_node = state_doc.documentElement
+        state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', index)
+        ctx.read_state_node = state_node
+        build_file(processor, state_node, do_children=True)
 
     #--
     # Go through all pages in state xml
     #--
-    for page in state_doc.xpath('//page'):
-                
-        src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
-        in_path = abs_in_path(ctx, src)
-        out_path = re.sub('\.pip$', '.html', abs_out_path(ctx, in_path))        
-        build_time = os.stat(out_path).st_mtime
-        
-        deps = [src] + [get_text(x) for x in page.xpath('depends/depend')]
-        if any(os.stat(abs_in_path(ctx, d)).st_mtime > build_time for d in deps):
-        
-            #--
-            # If any dependent files have a newer modification time than the target, rebuild
-            #--
-            ctx.read_state_node = page
-            state_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-            state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
-            build_file(processor, state_node)
-            
+    else:
+        for page in state_doc.xpath('//page'):                
+            src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
+            in_path = abs_in_path(ctx, src)
+            out_path = re.sub('\.pip$', '.html', abs_out_path(ctx, in_path))        
+            build_time = os.stat(out_path).st_mtime
+
+            deps = [src] + [get_text(x) for x in page.xpath('depends/depend')]
+            if any(os.stat(abs_in_path(ctx, d)).st_mtime > build_time for d in deps):
+
+                #--
+                # If any dependent files have a newer modification time than the target, rebuild
+                #--
+                ctx.read_state_node = page
+                state_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+                state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
+                build_file(processor, state_node)
+
     #--
     # Write the state DOM over the previous state XML
     #--
     state_file = open(state_xml, 'w')
     PrettyPrint(state_doc.documentElement, state_file)
     state_file.close()
+
 
 #--
 # Process a .pip file, and recursively process all its children.
 #--
 def build_file(processor, state_node, do_children=False):
-
     ctx = processor.extensionParams[(NAMESPACE, 'context')]
 
     #--
     # Locate the input file and read it
     #--
-    input_file = state_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
-    input = InputSource.DefaultFactory.fromUri(OsPathToUri(ctx.in_root + input_file))
-    output_file = re.sub('\.pip$', '.html', input_file)
-
-    #--
-    # Pass required information to XSLT extention functions
-    #--
-    ctx.file_name = input_file
-    ctx.out_file = output_file
+    ctx.file_name = state_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
+    input = InputSource.DefaultFactory.fromUri(OsPathToUri(ctx.in_root + ctx.file_name))
+    ctx.out_file = re.sub('\.pip$', '.html', ctx.file_name)
     ctx.state_node = state_node
 
     #--
@@ -163,13 +123,13 @@ def build_file(processor, state_node, do_children=False):
     try:
         output = processor.run(input)
     except Exception, e:
-        print 'Error: exception occured while processing %s:\n%s' % (input_file, e)
+        print 'Error: exception occured while processing %s:\n%s' % (ctr.file_name, e)
         sys.exit(1)
 
     #--
     # Determine the output file name and write output to it
     #--
-    abs_output_file = abs_out_path(ctx, abs_in_path(ctx, output_file))
+    abs_output_file = abs_out_path(ctx, abs_in_path(ctx, ctx.out_file))
     output_fh = open(abs_output_file, 'w')
     output_fh.write(output)
     output_fh.close()
@@ -238,10 +198,10 @@ if len(sys.argv) == 7 and sys.argv[1] == '-c':
 #--
 elif len(sys.argv) == 2:
     project_fname = '%s/%s.xml' % (project_dir, sys.argv[1])
-    rebuild_project(project_fname)
+    build_project(project_fname)
 elif len(sys.argv) == 3 and sys.argv[1] == '-f':
     project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
-    build_project(project_fname)
+    build_project(project_fname, full=True)
 
 #--
 # Otherwise the command line is invalid - display usage information
