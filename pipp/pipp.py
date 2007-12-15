@@ -36,10 +36,10 @@ def build_project(project, full=False):
     index = project_doc.xpath('string(/project/index)')
     stylesheet_fname = project_doc.xpath('string(/project/stylesheet)')
     state_xml = project_doc.xpath('string(/project/state)')
+    orig_state = open(state_xml).read()
 
     #--
     # Create the DOM for the state document
-    # TBD: make this the same for full/partial
     #--
     if full:
         state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
@@ -85,7 +85,17 @@ def build_project(project, full=False):
                 state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
                 page.parentNode.insertBefore(state_node, page)
                 build_file(processor, state_node)
-                page.parentNode.removeChild(state_node)
+                
+                #--
+                # Merge new state data into the tree
+                #--
+                cn = state_node.xpath('children')[0]
+                for x in list(cn.childNodes):
+                    cn.removeChild(x)
+                pcn = page.xpath('children')[0]
+                for x in list(pcn.childNodes):
+                    cn.appendChild(x)                
+                page.parentNode.removeChild(page)
 
     #--
     # Write the state DOM over the previous state XML
@@ -93,6 +103,12 @@ def build_project(project, full=False):
     state_file = open(state_xml, 'w')
     PrettyPrint(state_doc.documentElement, state_file)
     state_file.close()
+
+    #--
+    # If state has changed, do a full rebuild
+    #--
+    if open(state_xml).read() != orig_state:
+        build_project(project, full=True)
 
 
 #--
