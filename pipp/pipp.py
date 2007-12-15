@@ -96,9 +96,8 @@ def build_file(processor, state_node):
     try:
         output = processor.run(input)
     except Exception, e:
-        print e
-        print "During: " + input_file
-        raise 'a'
+        print 'Error: exception occured while processing %s:\n%s' % (input_file, e)
+        sys.exit(1)
 
     #--
     # Determine the output file name and write output to it
@@ -141,7 +140,8 @@ if len(sys.argv) == 7 and sys.argv[1] == '-c':
     #--
     project_fname = os.path.join(project_dir, '%s.xml' % project)
     if os.path.exists(project_fname):
-        raise "Project already exists"
+        print 'Error: Project already exists'
+        sys.exit(1)
 
     #--
     # Create the project file and empty state XML
