@@ -9,7 +9,7 @@ from Ft.Xml.Domlette import NonvalidatingReader
 from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Lib.Uri import OsPathToUri
 from Ft.Xml.XPath import Compile, Conversions
-import re, os, sys
+import re, os, sys, BaseHTTPServer, SimpleHTTPServer
 from pipp_utils import *
 
 #--
@@ -196,6 +196,17 @@ def build_file(processor, state_node, do_children=False):
                 build_file(processor, child, do_children=True)
 
 #--
+# Run as a webserver that outputs the selected project
+#--
+def serve_project(project):
+    project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
+    out_root = project_doc.xpath('string(/project/out-root)')
+    os.chdir(out_root)
+    httpd = BaseHTTPServer.HTTPServer(('127.0.0.1', 8080), SimpleHTTPServer.SimpleHTTPRequestHandler)
+    httpd.serve_forever()
+
+
+#--
 # Main entry point - parse the command line
 #--
 
@@ -253,6 +264,10 @@ elif len(sys.argv) == 2:
 elif len(sys.argv) == 3 and sys.argv[1] == '-f':
     project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
     build_project(project_fname, full=True)
+elif len(sys.argv) == 3 and sys.argv[1] == '-s':
+    project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
+    serve_project(project_fname)
+
 
 #--
 # Otherwise the command line is invalid - display usage information
