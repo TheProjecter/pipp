@@ -106,11 +106,11 @@ def pipp_export(context, name, value):
 #--
 def pipp_import(context, name):
     name = Conversions.StringValue(name)
-    cur_doc = context.processor.extensionParams[(NAMESPACE, 'state_node')]
+    cur_doc = context.processor.extensionParams[(NAMESPACE, 'read_state_node')]
     while cur_doc:
-        cur_exp = [x for x in cur_doc.childNodes if x.tagName == 'exports'][0]
+        cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
         for node in cur_exp.childNodes:
-            if node.tagName == name:
+            if getattr(node, 'tagName', None) == name:
                 return get_text(node)
         cur_doc = cur_doc.parentNode.parentNode
     raise Exception("Import not found")
@@ -122,12 +122,12 @@ def pipp_import(context, name):
 #--
 def pipp_import_join(context, name, join_str):
     name = Conversions.StringValue(name)
-    cur_doc = context.processor.extensionParams[(NAMESPACE, 'state_node')]
+    cur_doc = context.processor.extensionParams[(NAMESPACE, 'read_state_node')]
     values = []
     while cur_doc:
-        cur_exp = [x for x in cur_doc.childNodes if x.tagName == 'exports'][0]
+        cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
         for node in cur_exp.childNodes:
-            if node.tagName == name:
+            if getattr(node, 'tagName', None) == name:
                 values.insert(0, get_text(node))
         cur_doc = cur_doc.parentNode.parentNode
     return Conversions.StringValue(join_str).join(values)
@@ -151,7 +151,7 @@ def pipp_map_view(context, xslt_file):
     # Copy variables relevant to current file from pipp processor to the map view
     # processor.
     #--
-    for var in ['in_root', 'out_root', 'state_doc', 'state_node', 'file_name', 'out_file', 'depends_node']:
+    for var in ['in_root', 'out_root', 'state_doc', 'read_state_node', 'state_node', 'file_name', 'out_file', 'depends_node']:
         processors[xslt_file].extensionParams[(NAMESPACE, var)] = context.processor.extensionParams[(NAMESPACE, var)]
 
     #--

@@ -8,7 +8,7 @@ from Ft.Xml import InputSource, EMPTY_NAMESPACE
 from Ft.Xml.Domlette import NonvalidatingReader
 from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Lib.Uri import OsPathToUri
-from Ft.Xml.XPath import Compile
+from Ft.Xml.XPath import Compile, Conversions
 from pipp_utils import *
 import re, os, sys
 
@@ -51,7 +51,72 @@ def build_project(project):
     #--
     state_node = state_doc.documentElement
     state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', index)
-    build_file(processor, state_node)
+    processor.extensionParams[(NAMESPACE, 'read_state_node')] = state_node
+    build_file(processor, state_node, do_children=True)
+
+    #--
+    # Write the state DOM over the previous state XML
+    #--
+    state_file = open(state_xml, 'w')
+    PrettyPrint(state_doc.documentElement, state_file)
+    state_file.close()
+
+#--
+# Build a project - read the project file and run the XSLT processor on the
+# index page.
+#--
+def rebuild_project(project):
+
+    #--
+    # Parse the project definition
+    #--
+    project_doc = NonvalidatingReader.parseUri(OsPathToUri(project))
+    in_root = project_doc.xpath('string(/project/in-root)')
+    out_root = project_doc.xpath('string(/project/out-root)')
+    index = project_doc.xpath('string(/project/index)')
+    stylesheet_fname = project_doc.xpath('string(/project/stylesheet)')
+    state_xml = project_doc.xpath('string(/project/state)')
+
+    #--
+    # Create the DOM for the state document
+    #--
+    state_doc = NonvalidatingReader.parseUri(OsPathToUri(state_xml))
+
+    #--
+    # Create the XSLT processor
+    #--
+    processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
+    processor.registerExtensionModules(['pipp_xslt'])
+    stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(in_root + stylesheet_fname))
+    processor.appendStylesheet(stylesheet)
+
+    processor.extensionParams[(NAMESPACE, 'in_root')] = in_root
+    processor.extensionParams[(NAMESPACE, 'out_root')] = out_root
+    processor.extensionParams[(NAMESPACE, 'state_xml')] = state_xml
+    processor.extensionParams[(NAMESPACE, 'state_doc')] = state_doc
+
+    #--
+    # Go through all pages in state xml
+    #--
+    for page in state_doc.xpath('//page'):
+                
+        src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
+        in_path = abs_in_path(processor, src)
+        out_path = re.sub('\.pip$', '.html', abs_out_path(processor, in_path))        
+        build_time = os.stat(out_path).st_mtime
+        
+        deps = [src] + [x.firstChild.nodeValue for x in page.xpath('depends/depend')]
+        if any(os.stat(abs_in_path(processor, d)).st_mtime > build_time for d in deps):
+        
+            #--
+            # If any dependent files have a newer modification time than the target, rebuild
+            #--
+            processor.extensionParams[(NAMESPACE, 'read_state_node')] = page
+            state_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+            state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
+            build_file(processor, state_node)
+            
+            # TBD: save changes to state            
 
     #--
     # Write the state DOM over the previous state XML
@@ -63,7 +128,7 @@ def build_project(project):
 #--
 # Process a .pip file, and recursively process all its children.
 #--
-def build_file(processor, state_node):
+def build_file(processor, state_node, do_children=False):
     in_root = processor.extensionParams[(NAMESPACE, 'in_root')]
     out_root = processor.extensionParams[(NAMESPACE, 'out_root')]
     state_doc = processor.extensionParams[(NAMESPACE, 'state_doc')]
@@ -111,10 +176,12 @@ def build_file(processor, state_node):
     # Process all this file's children. If the child already has child nodes in
     # the state dom, it is a "child-file" and not processed.
     #--
-    children_node = processor.extensionParams[(NAMESPACE, 'children_node')]
-    for child in children_node.childNodes:
-        if not child.hasChildNodes():
-            build_file(processor, child)
+    if do_children:
+        children_node = processor.extensionParams[(NAMESPACE, 'children_node')]
+        for child in children_node.childNodes:
+            if not child.hasChildNodes():
+                processor.extensionParams[(NAMESPACE, 'read_state_node')] = child
+                build_file(processor, child, do_children=True)
 
 #--
 # Main entry point - parse the command line
@@ -170,6 +237,9 @@ if len(sys.argv) == 7 and sys.argv[1] == '-c':
 #--
 elif len(sys.argv) == 2:
     project_fname = '%s/%s.xml' % (project_dir, sys.argv[1])
+    rebuild_project(project_fname)
+elif len(sys.argv) == 3 and sys.argv[1] == '-f':
+    project_fname = '%s/%s.xml' % (project_dir, sys.argv[2])
     build_project(project_fname)
 
 #--
