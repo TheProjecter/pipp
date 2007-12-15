@@ -22,13 +22,12 @@ files = {}
 # the state DOM; the main pipp process will notice this and build the file.
 #--
 def pipp_child(context, file_name):
-    file_name = abs_in_path(context.processor, Conversions.StringValue(file_name)) \
-                                [len(context.processor.extensionParams[(NAMESPACE, 'in_root')]):]
-    state_doc = context.processor.extensionParams[(NAMESPACE, 'state_doc')]
-    children_node = context.processor.extensionParams[(NAMESPACE, 'children_node')]
-    new_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    file_name = abs_in_path(ctx, Conversions.StringValue(file_name)) \
+                                [len(ctx.in_root):]
+    new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
     new_node.setAttributeNS(EMPTY_NAMESPACE, 'src', file_name)
-    children_node.appendChild(new_node)
+    ctx.children_node.appendChild(new_node)
 
 #--
 # Copy a file from in-root to out-root. For efficiency it keeps track of the
@@ -36,14 +35,14 @@ def pipp_child(context, file_name):
 # module to support wildcards in file names.
 #--
 def pipp_file(context, file_name):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     file_name = Conversions.StringValue(file_name)
-    file_names = glob.glob(abs_in_path(context.processor, file_name))
+    file_names = glob.glob(abs_in_path(ctx, file_name))
     if len(file_names) == 0:
         raise Exception('No files found: ' + file_name)
-    in_root = context.processor.extensionParams[(NAMESPACE, 'in_root')]
     for in_name in file_names:
-        add_depends(context, in_name[len(in_root):])
-        out_name = abs_out_path(context.processor, in_name)
+        add_depends(ctx, in_name[len(ctx.in_root):])
+        out_name = abs_out_path(ctx, in_name)
         if not files.has_key(in_name):
             out_fh = open(out_name, 'wb')
             out_fh.write(open(in_name, 'rb').read())
@@ -55,6 +54,7 @@ def pipp_file(context, file_name):
 # This function does not support wildcards in file names.
 #--
 def pipp_child_file(context, src, title):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
 
     #--
     # Copy the file, using a cache for efficiency
@@ -63,9 +63,9 @@ def pipp_child_file(context, src, title):
     if in_name.startswith('http'):
         link_name = in_name
     else:
-        in_name = abs_in_path(context.processor, in_name)
-        out_name = abs_out_path(context.processor, in_name)
-        link_name = out_name[len(context.processor.extensionParams[(NAMESPACE, 'out_root')]):]
+        in_name = abs_in_path(ctx, in_name)
+        out_name = abs_out_path(ctx, in_name)
+        link_name = out_name[len(ctx.out_root):]
         if not files.has_key(in_name):
             out_fh = open(out_name, 'wb')
             out_fh.write(open(in_name, 'rb').read())
@@ -75,38 +75,36 @@ def pipp_child_file(context, src, title):
     #--
     # Update the state DOM
     #--
-    state_doc = context.processor.extensionParams[(NAMESPACE, 'state_doc')]
-
-    new_page_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-    new_page_node.setAttributeNS(EMPTY_NAMESPACE, 'src', in_name[len(context.processor.extensionParams[(NAMESPACE, 'in_root')]):])
-    new_exports_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'exports')
-    new_title_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'title')
-    new_title_node.appendChild(state_doc.createTextNode(Conversions.StringValue(title)))
-    new_link_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'link')
-    new_link_node.appendChild(state_doc.createTextNode(link_name))
+    new_page_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+    new_page_node.setAttributeNS(EMPTY_NAMESPACE, 'src', in_name[len(ctx.in_root):])
+    new_exports_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'exports')
+    new_title_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'title')
+    new_title_node.appendChild(ctx.state_doc.createTextNode(Conversions.StringValue(title)))
+    new_link_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'link')
+    new_link_node.appendChild(ctx.state_doc.createTextNode(link_name))
 
     new_exports_node.appendChild(new_title_node)
     new_exports_node.appendChild(new_link_node)
     new_page_node.appendChild(new_exports_node)
-    context.processor.extensionParams[(NAMESPACE, 'children_node')].appendChild(new_page_node)
+    ctx.children_node.appendChild(new_page_node)
 
 #--
 # Export a variable from the current page, storing it in the state DOM.
 #--
 def pipp_export(context, name, value):
-    state_doc = context.processor.extensionParams[(NAMESPACE, 'state_doc')]
-    exports_node = context.processor.extensionParams[(NAMESPACE, 'exports_node')]
-    new_node = state_doc.createElementNS(EMPTY_NAMESPACE, Conversions.StringValue(name))
-    new_node.appendChild(state_doc.createTextNode(Conversions.StringValue(value)))
-    exports_node.appendChild(new_node)
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, Conversions.StringValue(name))
+    new_node.appendChild(ctx.state_doc.createTextNode(Conversions.StringValue(value)))
+    ctx.exports_node.appendChild(new_node)
 
 #--
 # Import an exported variable. If this isn't defined by the current file, the
 # function searches up the page tree until it finds a definition.
 #--
 def pipp_import(context, name):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     name = Conversions.StringValue(name)
-    cur_doc = context.processor.extensionParams[(NAMESPACE, 'read_state_node')]
+    cur_doc = ctx.read_state_node
     while cur_doc:
         cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
         for node in cur_exp.childNodes:
@@ -121,8 +119,9 @@ def pipp_import(context, name):
 # separator.
 #--
 def pipp_import_join(context, name, join_str):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     name = Conversions.StringValue(name)
-    cur_doc = context.processor.extensionParams[(NAMESPACE, 'read_state_node')]
+    cur_doc = ctx.read_state_node
     values = []
     while cur_doc:
         cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
@@ -137,45 +136,40 @@ def pipp_import_join(context, name, join_str):
 # state file.
 #--
 def pipp_map_view(context, xslt_file):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
 
     #--
     # Create the XSLT processor object. For efficiency there is a cache of these.
     #--
-    xslt_file = abs_in_path(context.processor, Conversions.StringValue(xslt_file))
+    xslt_file = abs_in_path(ctx, Conversions.StringValue(xslt_file))
     if not processors.has_key(xslt_file):
         processors[xslt_file]= Processor.Processor()
         processors[xslt_file].registerExtensionModules(['pipp_xslt'])
         processors[xslt_file].appendStylesheet(InputSource.DefaultFactory.fromString(open(xslt_file).read(), xslt_file))
-
-    #--
-    # Copy variables relevant to current file from pipp processor to the map view
-    # processor.
-    #--
-    for var in ['in_root', 'out_root', 'state_doc', 'read_state_node', 'state_node', 'file_name', 'out_file', 'depends_node']:
-        processors[xslt_file].extensionParams[(NAMESPACE, var)] = context.processor.extensionParams[(NAMESPACE, var)]
+    processors[xslt_file].extensionParams[(NAMESPACE, 'context')] = ctx
 
     #--
     # Run the processor against state.xml and return the output.
     #--
-    state_xml = context.processor.extensionParams[(NAMESPACE, 'state_xml')]
-    input = InputSource.DefaultFactory.fromUri(OsPathToUri(state_xml))
+    input = InputSource.DefaultFactory.fromUri(OsPathToUri(ctx.state_xml))
     return processors[xslt_file].run(input)
 
 #--
 # Get the current file name.
 #--
 def pipp_file_name(context):
-    return context.processor.extensionParams[(NAMESPACE, 'out_file')]
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    return ctx.out_file
 
 #--
 # Display the last modification time of the current file, using the provided
 # date format string.
 #--
 def pipp_file_time(context, fmt):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     fmt = Conversions.StringValue(fmt)
-    fname = context.processor.extensionParams[(NAMESPACE, 'in_root')] + \
-                    context.processor.extensionParams[(NAMESPACE, 'file_name')]
-    return time.strftime(fmt, time.localtime(os.stat(fname)[stat.ST_MTIME]))
+    fname = ctx.in_root + ctx.file_name
+    return time.strftime(fmt, time.localtime(os.stat(fname).st_mtime))
 
 #--
 # Given a path relative to in_root, return a path relative to current file
@@ -184,12 +178,12 @@ def pipp_file_time(context, fmt):
 # same letter.
 #--
 def pipp_relative_path(context, link):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
     link = Conversions.StringValue(link)
     if len(link) == 0: return ''
     if link[0] != '/': return link
-    link_path = context.processor.extensionParams[(NAMESPACE, 'in_root')] + link
-    file_path = os.path.dirname(context.processor.extensionParams[(NAMESPACE, 'in_root')] + \
-                                                            context.processor.extensionParams[(NAMESPACE, 'file_name')]) + '/'
+    link_path = ctx.in_root + link
+    file_path = os.path.dirname(ctx.in_root + ctx.file_name) + '/'
 
     common_prefix = os.path.commonprefix([file_path, link_path])
     common_prefix = re.sub('[^/]*$', '', common_prefix)
@@ -201,9 +195,9 @@ def pipp_relative_path(context, link):
 # perl script "code2html".
 #--
 def pipp_code(context, src):
-    abs_src = abs_in_path(context.processor, Conversions.StringValue(src))
-    in_root = context.processor.extensionParams[(NAMESPACE, 'in_root')]
-    add_depends(context, abs_src[len(in_root):])
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    abs_src = abs_in_path(ctx, Conversions.StringValue(src))
+    add_depends(ctx, abs_src[len(ctx.in_root):])
 
     code2html_cmd = '%s/code2html -o html-css %s' % (pipp_dir, abs_src)
     if os.name == 'nt':
@@ -223,13 +217,15 @@ def pipp_code(context, src):
 # For efficiency they keep a cache of open image objects.
 #--
 def pipp_image_width(context, src):
-    image_name = abs_in_path(context.processor, Conversions.StringValue(src))
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    image_name = abs_in_path(ctx, Conversions.StringValue(src))
     if not images.has_key(image_name):
         images[image_name] = Image.open(image_name)
     return images[image_name].size[0]
 
 def pipp_image_height(context, src):
-    image_name = abs_in_path(context.processor, Conversions.StringValue(src))
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    image_name = abs_in_path(ctx, Conversions.StringValue(src))
     if not images.has_key(image_name):
         images[image_name] = Image.open(image_name)
     return images[image_name].size[1]
@@ -238,9 +234,9 @@ def pipp_image_height(context, src):
 # Create a thumbnail of an image, at the specified size.
 #--
 def pipp_thumbnail(context, src, width, height):
-    image_name = abs_in_path(context.processor, Conversions.StringValue(src))
-    in_root = context.processor.extensionParams[(NAMESPACE, 'in_root')]
-    add_depends(context, image_name[len(in_root):])
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    image_name = abs_in_path(ctx, Conversions.StringValue(src))
+    add_depends(ctx, image_name[len(ctx.in_root):])
     thumb_name = re.sub('(\.\w+)$', '_thumb\g<1>', Conversions.StringValue(src))
     
     if width:
@@ -257,12 +253,12 @@ def pipp_thumbnail(context, src, width, height):
         height = int(h * width / w)    
     
     img = img.resize((width, height))
-    img.save(abs_out_path(context.processor, abs_in_path(context.processor, thumb_name)))
+    img.save(abs_out_path(ctx, abs_in_path(ctx, thumb_name)))
 
     #--
     # Add image to cache using fake inroot name, so width/height functions work
     #--
-    images[abs_in_path(context.processor, thumb_name)] = img
+    images[abs_in_path(ctx, thumb_name)] = img
 
     return thumb_name
 
@@ -273,20 +269,24 @@ def pipp_thumbnail(context, src, width, height):
 # The background colour must be specified for anti-aliasing to work properly.
 #--
 def pipp_gtitle(context, font, height, texture, bgcolor, text):
-    # Not that important
-    #add_depends(context, Conversions.StringValue(font))
-    #add_depends(context, Conversions.StringValue(texture))
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+
+    #--
+    # Technical dependencies; not really important. Not activating for the time being.
+    #--
+    #add_depends(ctx, Conversions.StringValue(font))
+    #add_depends(ctx, Conversions.StringValue(texture))
 
     #--
     # Convert the XSLT parameters into regular python types
     #--
-    font = abs_in_path(context.processor, Conversions.StringValue(font))
+    font = abs_in_path(ctx, Conversions.StringValue(font))
     height = int(Conversions.NumberValue(height))
-    texture = abs_in_path(context.processor, Conversions.StringValue(texture))
+    texture = abs_in_path(ctx, Conversions.StringValue(texture))
     bgcolor = int(Conversions.StringValue(bgcolor)[1:], 16)
     text = Conversions.StringValue(text)
     file_name = re.sub('[^a-zA-Z0-9]', '_', text) + '.png'
-    pseudo_in_name = abs_in_path(context.processor, file_name)
+    pseudo_in_name = abs_in_path(ctx, file_name)
 
     # Avoid unwanted cropping on the left
     text = '    ' + text
@@ -315,7 +315,7 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
     out = Image.new('RGBA', text_mask.size, bgcolor)
     out.paste(background, (0, 0), text_mask)
     out = out.convert('P')    
-    out.save(abs_out_path(context.processor, pseudo_in_name), transparency=0)
+    out.save(abs_out_path(ctx, pseudo_in_name), transparency=0)
 
     #--
     # Add image to cache using fake inroot name, so width/height functions work

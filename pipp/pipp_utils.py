@@ -22,20 +22,18 @@ project_dir = os.path.join(pipp_dir, 'projects')
 # is relative, it is relative to the current file. If it is absolute then the
 # in-root is prepended.
 #--
-def abs_in_path(processor, file_name):
+def abs_in_path(ctx, file_name):
     if file_name[0] == '/':
-        return processor.extensionParams[(NAMESPACE, 'in_root')] + file_name
+        return ctx.in_root + file_name
     else:
-        return os.path.dirname(processor.extensionParams[(NAMESPACE, 'in_root')] + \
-                processor.extensionParams[(NAMESPACE, 'file_name')]) + '/' + file_name
+        return os.path.dirname(ctx.in_root + ctx.file_name) + '/' + file_name
 
 #--
 # Given an absolute input path, return the absolute output path. If the output
 # directories do not exist then this function will create them.
 #--
-def abs_out_path(processor, in_path):
-    abs_output_file = processor.extensionParams[(NAMESPACE, 'out_root')] + \
-                 in_path[len(processor.extensionParams[(NAMESPACE, 'in_root')]):]
+def abs_out_path(ctx, in_path):
+    abs_output_file = ctx.out_root + in_path[len(ctx.in_root):]
     if not os.path.isdir(os.path.dirname(abs_output_file)):
         os.makedirs(os.path.dirname(abs_output_file))
     return abs_output_file
@@ -54,12 +52,10 @@ def get_text(node):
 #--
 # Add a dependency
 #--
-def add_depends(context, file_name):
-    state_doc = context.processor.extensionParams[(NAMESPACE, 'state_doc')]
-    depends_node = context.processor.extensionParams[(NAMESPACE, 'depends_node')]
-    for node in depends_node.childNodes:
+def add_depends(ctx, file_name):
+    for node in ctx.depends_node.childNodes:
         if file_name == node.firstChild.nodeValue:
             return
-    new_node = state_doc.createElementNS(EMPTY_NAMESPACE, 'depend')
-    new_node.appendChild(state_doc.createTextNode(file_name))
-    depends_node.appendChild(new_node)
+    new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'depend')
+    new_node.appendChild(ctx.state_doc.createTextNode(file_name))
+    ctx.depends_node.appendChild(new_node)
