@@ -63,6 +63,7 @@ class PippContext(object):
         #--
         new_state = open(self.state_xml).read()
         if new_state != self.orig_state:
+            print "State has changed; initiating full rebuild"
             build_project_full(self.in_root)
             self.orig_state = new_state
 
