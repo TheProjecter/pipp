@@ -1,0 +1,11 @@
+<pipp>
+<title>Section B</title>
+<logo>crypto.gif</logo>
+<body>
+
+<pipp-child src="page1.pip"/>
+
+<p>Text goes here</p>
+
+</body>
+</pipp>
