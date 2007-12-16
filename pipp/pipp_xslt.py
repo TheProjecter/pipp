@@ -7,7 +7,7 @@ from Ft.Xml.Xslt import Processor
 from Ft.Xml.XPath import Conversions
 from Ft.Lib.Uri import OsPathToUri
 from pipp_utils import *
-import os, re, string, time, glob, stat
+import os, re, string, time, glob, stat, shutil
 import Image, ImageDraw, ImageFont
 
 #--
@@ -44,9 +44,10 @@ def pipp_file(context, file_name):
         ctx.add_depends(in_name[len(ctx.in_root):])
         out_name = ctx.abs_out_path(in_name)
         if not files.has_key(in_name):
-            out_fh = open(out_name, 'wb')
-            out_fh.write(open(in_name, 'rb').read())
-            out_fh.close()
+            if os.path.isfile(in_name):
+                shutil.copyfile(in_name, out_name)
+            else:
+                copytree(in_name, out_name, skip_copy)
             files[in_name] = 1
 
 #--
