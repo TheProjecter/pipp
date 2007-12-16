@@ -141,6 +141,10 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 def serve_project(in_root):
     ctx = PippContext(in_root, False)
+    if not os.path.exists(ctx.state_xml) or not os.path.exists(ctx.out_root):
+        print "Project's first use - initiating full build"
+        build_project_full(in_root)
+        ctx = PippContext(in_root, False) # TBD: this is a little hacky; refactor
     os.chdir(ctx.out_root)
     
     node_map = {}
