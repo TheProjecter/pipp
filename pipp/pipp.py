@@ -9,7 +9,7 @@ from Ft.Xml.Domlette import NonvalidatingReader
 from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Lib.Uri import OsPathToUri
 from Ft.Xml.XPath import Compile, Conversions
-import re, os, sys, BaseHTTPServer, SimpleHTTPServer
+import re, os, sys, BaseHTTPServer, SimpleHTTPServer, traceback
 from pipp_utils import *
 
 #--
@@ -132,12 +132,18 @@ def build_project(in_root):
 #--
 class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_GET(self):      
-        if self.server.node_map.has_key(self.path):
-            state_node = cond_build_file(self.server.ctx, self.server.node_map[self.path], self.server.ctx.out_root + self.path, self.server.processor)
-            if state_node:
-                self.server.ctx.write_state()
-                self.server.node_map[self.path] = state_node
-        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        try:
+            if self.server.node_map.has_key(self.path):
+                state_node = cond_build_file(self.server.ctx, self.server.node_map[self.path], self.server.ctx.out_root + self.path, self.server.processor)
+                if state_node:
+                    self.server.ctx.write_state()
+                    self.server.node_map[self.path] = state_node
+            SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        except:
+            self.send_response(500)
+            self.send_header("Content-type", 'text/plain')
+            self.end_headers()
+            self.wfile.write(traceback.format_exc())
 
 def serve_project(in_root):
     ctx = PippContext(in_root, False)
@@ -217,11 +223,7 @@ def build_file(processor, state_node, do_children=False):
     #--
     # Run the XSLT processor
     #--
-    try:
-        output = processor.run(input)
-    except Exception, e:
-        print 'Error: exception occured while processing %s:\n%s' % (ctx.file_name, e)
-        sys.exit(1)
+    output = processor.run(input)
 
     #--
     # Determine the output file name and write output to it
