@@ -173,7 +173,11 @@ def cond_build_file(ctx, page, out_path, processor):
         state_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
         state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', src)
         page.parentNode.insertBefore(state_node, page)
-        build_file(processor, state_node)
+        try:
+            build_file(processor, state_node)
+        except:
+            page.parentNode.removeChild(state_node)
+            raise            
 
         #--
         # Merge new state data into the tree
