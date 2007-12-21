@@ -58,9 +58,9 @@ class PippProject(object):
         #--
         new_state = open(self.state_xml).read()
         if new_state != self.orig_state:
-            print "State has changed; initiating full rebuild"
-            self.build_full(self.in_root)
+            print "State has changed - initiating full rebuild"
             self.orig_state = new_state
+            PippProject(self.in_root, True).build_full()
 
     #--
     # Given an absolute input path, return the absolute output path. If the output

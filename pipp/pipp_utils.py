@@ -33,7 +33,8 @@ def get_text(node):
 # Copy a directory tree, excluding certain names
 #--
 def copytree(src, dst, skip):
-    shutil.rmtree(dst)
+    if os.path.exists(dst):
+        shutil.rmtree(dst)
     for dirpath, dirnames, filenames in os.walk(src):
         for s in skip:
             dirnames.remove(s)
