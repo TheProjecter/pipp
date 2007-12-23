@@ -60,6 +60,7 @@ class PippProject(object):
         if new_state != self.orig_state:
             print "State has changed - initiating full rebuild"
             self.orig_state = new_state
+            # TBD: can we do this without creating a new project instance?
             PippProject(self.in_root, True).build_full()
 
     #--
@@ -115,6 +116,7 @@ class PippProject(object):
 
         httpd = BaseHTTPServer.HTTPServer(listen, PippHTTPRequestHandler)
         httpd.pipp_project = self
+        print "Serving project at http://127.0.0.1:8080/"
         httpd.serve_forever()
 
 
@@ -243,6 +245,9 @@ class PippFile(object):
 # files on demand.
 #--
 class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
+    def log_request(self, code, size=None):
+        pass
+
     def do_GET(self):      
         try:
             if self.server.pipp_project.node_map.has_key(self.path):            
