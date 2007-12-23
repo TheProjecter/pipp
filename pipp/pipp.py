@@ -10,6 +10,7 @@ from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Lib.Uri import OsPathToUri
 from Ft.Xml.XPath import Compile, Conversions
 import re, os, sys, BaseHTTPServer, SimpleHTTPServer, traceback
+from optparse import OptionParser
 from pipp_utils import *
 
 
@@ -20,7 +21,7 @@ class PippProject(object):
         #--
         # Parse the project definition
         #--
-        self.in_root = in_root.rstrip('\\.') # TBD!!!!
+        self.in_root = in_root.rstrip('/\\.') # TBD!!!!
         self.out_root = os.path.join(self.in_root, 'out')
         self.index = '/index.pip'
         self.stylesheet_fname = '/pipp.xsl'
@@ -99,7 +100,7 @@ class PippProject(object):
     #--
     # Serve a project with the built-in web server
     #--
-    def serve(self, listen=('127.0.0.1', 8080)):
+    def serve(self, listen):
         if not os.path.exists(self.state_xml) or not os.path.exists(self.out_root):
             print "Project's first use - initiating full build"
             self.build_full()
@@ -116,7 +117,7 @@ class PippProject(object):
 
         httpd = BaseHTTPServer.HTTPServer(listen, PippHTTPRequestHandler)
         httpd.pipp_project = self
-        print "Serving project at http://127.0.0.1:8080/"
+        print "Serving project at http://%s:%d/" % listen
         httpd.serve_forever()
 
 
@@ -266,26 +267,24 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
 #--
 # Main entry point - parse the command line
 #--
-if len(sys.argv) == 2:
-    in_root = os.path.join(os.getcwd(), sys.argv[1])
-    PippProject(in_root, False).build()
-elif len(sys.argv) == 3 and sys.argv[1] == '-f':
-    in_root = os.path.join(os.getcwd(), sys.argv[2])
-    PippProject(in_root, True).build_full()
-elif len(sys.argv) == 3 and sys.argv[1] == '-s':
-    in_root = os.path.join(os.getcwd(), sys.argv[2])
-    PippProject(in_root, False).serve()
+parser = OptionParser(usage="usage: %prog [options] project_root")
+parser.add_option("-s", "--serve", dest="serve", action='store_true',
+        help='Start a web server that publishes the project')
+parser.add_option("-p", "--port", dest="port", type='int', default=8080,
+        help='Specify port for the web server (default %default)')
+parser.add_option("-l", "--listen", dest="listen", default='127.0.0.1',
+        help='Specify the listening address for the web server (default %default)')
+parser.add_option("-f", "--full", dest="full", action='store_true',
+        help='Initiate a full rebuild of the project')
 
-
-#--
-# Otherwise the command line is invalid - display usage information
-#--
+(options, args) = parser.parse_args()
+if len(args) != 1:
+    parser.print_help()
 else:
-    print """
-Pipp - Python Internet Pre-Processor
-Copyright 2004-2007 Paul Johnston, distributed under the BSD license
-
-Usage: %s [-f] [-s] [path]
-
-For full details, please read the documentation.
-""" % (sys.argv[0], sys.argv[0])
+    in_root = os.path.join(os.getcwd(), args[0])
+    if options.full:
+        PippProject(in_root, True).build_full()
+    if options.serve:
+        PippProject(in_root, False).serve(listen=(options.listen, options.port))
+    if not options.full and not options.serve:
+        PippProject(in_root, False).build()
