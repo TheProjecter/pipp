@@ -101,19 +101,13 @@ class PippProject(object):
     # Serve a project with the built-in web server
     #--
     def serve(self, listen):
+        # TBD: this shouldn't live in serve
         if not os.path.exists(self.state_xml) or not os.path.exists(self.out_root):
             print "Project's first use - initiating full build"
             self.build_full()
             # TBD: this is a little hacky; refactor
             self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
         os.chdir(self.out_root)
-
-        self.node_map = {}
-        for page in self.state_doc.xpath('//page'):                
-            src = Conversions.StringValue(page.attributes[(EMPTY_NAMESPACE, 'src')])
-            in_path = self.abs_in_path(src)
-            out_path = re.sub('\.pip$', '.html', self.abs_out_path(in_path))        
-            self.node_map[out_path[len(self.out_root):]] = page
 
         httpd = BaseHTTPServer.HTTPServer(listen, PippHTTPRequestHandler)
         httpd.pipp_project = self
@@ -251,11 +245,13 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def do_GET(self):      
         try:
-            if self.server.pipp_project.node_map.has_key(self.path):            
-                state_node = PippFile(self.server.pipp_project, self.server.pipp_project.node_map[self.path]).cond_build()
-                if state_node:
-                    self.server.pipp_project.write_state()
-                    self.server.pipp_project.node_map[self.path] = state_node
+            if self.path.endswith('.html'):
+                path = re.sub('.html$', '.pip', self.path)
+                # Note: risk of xpath injection here; removing single quotes should protect
+                nodes = self.server.pipp_project.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
+                if nodes:
+                    if PippFile(self.server.pipp_project, nodes[0]).cond_build():
+                        self.server.pipp_project.write_state()
             SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
         except:
             self.send_response(500)
