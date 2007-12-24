@@ -16,27 +16,22 @@ from pipp_utils import *
 
 class PippProject(object):
     
-    def __init__(self, in_root, full):
+    def __init__(self, in_root, options):
 
         #--
         # Parse the project definition
         #--
+        self.options = options
         self.in_root = in_root.rstrip('/\\.') # TBD!!!!
         self.out_root = os.path.join(self.in_root, 'out')
         self.index = '/index.pip'
         self.stylesheet_fname = '/pipp.xsl'
         self.state_xml = os.path.join(in_root, 'pipp.xml')
-        if not os.path.exists(self.state_xml):
-            open(self.state_xml, 'w').write('<page src=""/>')
-        self.orig_state = open(self.state_xml).read()
-
-        #--
-        # Create the DOM for the state document
-        #--
-        if full:
-            self.state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
-        else:
-            self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
+        self.state_changed = False
+        self.new_project = not os.path.exists(self.state_xml)
+        if self.new_project:
+            open(self.state_xml, 'w').write('<page/>')
+        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
 
         #--
         # Create the XSLT processor
@@ -46,6 +41,8 @@ class PippProject(object):
         stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(self.in_root + self.stylesheet_fname))
         self.processor.appendStylesheet(stylesheet)
 
+
+
     #--
     # Write the state DOM over the previous state XML
     #--
@@ -54,15 +51,9 @@ class PippProject(object):
         PrettyPrint(self.state_doc.documentElement, state_file)
         state_file.close()
 
-        #--
-        # If state has changed, do a full rebuild
-        #--
-        new_state = open(self.state_xml).read()
-        if new_state != self.orig_state:
+        if self.state_changed:
             print "State has changed - initiating full rebuild"
-            self.orig_state = new_state
-            # TBD: can we do this without creating a new project instance?
-            PippProject(self.in_root, True).build_full()
+            self.build_full()
 
     #--
     # Given an absolute input path, return the absolute output path. If the output
@@ -84,9 +75,10 @@ class PippProject(object):
     # Full build of a project. Process the index page and recurse.
     #--
     def build_full(self):
+        self.state_changed = False
         state_node = self.state_doc.documentElement
         state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.index)
-        PippFile(self, state_node).build(do_children=True)
+        PippFile(self, state_node).build(force=True)
         self.write_state()
 
     #--
@@ -94,34 +86,59 @@ class PippProject(object):
     #--
     def build(self):
         for state_node in self.state_doc.xpath('//page'):                
-            PippFile(self, state_node).cond_build()
+            PippFile(self, state_node).build(force=False)
         self.write_state()
 
     #--
     # Serve a project with the built-in web server
     #--
     def serve(self, listen):
-        # TBD: this shouldn't live in serve
-        if not os.path.exists(self.state_xml) or not os.path.exists(self.out_root):
-            print "Project's first use - initiating full build"
-            self.build_full()
-            # TBD: this is a little hacky; refactor
-            self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
         os.chdir(self.out_root)
-
         httpd = BaseHTTPServer.HTTPServer(listen, PippHTTPRequestHandler)
         httpd.pipp_project = self
         print "Serving project at http://%s:%d/" % listen
         httpd.serve_forever()
 
 
+#--
+# Run as a webserver that outputs the selected project, rebuilding output
+# files on demand.
+#--
+class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
+    def log_request(self, code, size=None):
+        pass
+
+    def do_GET(self):      
+        try:
+            if self.path.endswith('.html'):
+                path = re.sub('.html$', '.pip', self.path)
+                # Note: risk of xpath injection here; removing single quotes should protect
+                nodes = self.server.pipp_project.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
+                if nodes:
+                    if PippFile(self.server.pipp_project, nodes[0]).build(force=False):
+                        self.server.pipp_project.write_state()
+            SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        except:
+            self.send_response(500)
+            self.send_header("Content-type", 'text/plain')
+            self.end_headers()
+            self.wfile.write(traceback.format_exc())
+
+            
 class PippFile(object):
 
-    def __init__(self, project, state_node):
+    def __init__(self, project, old_state_node):
         self.project = project
-        self.state_node = state_node
-        self.file_name = state_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
+        self.old_state_node = old_state_node
+        self.file_name = old_state_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
         self.out_file = re.sub('\.pip$', '.html', self.file_name)
+        
+        self.state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+        self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)        
+        for node_name in ['exports', 'depends', 'children']:
+            new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
+            self.state_node.appendChild(new_node)
+            setattr(self, node_name + '_node', new_node)
 
     @property
     def in_root(self):
@@ -167,22 +184,35 @@ class PippFile(object):
     #--
     # Process a .pip file
     #--
-    def build(self, do_children=False):
+    def build(self, force=False):
 
         #--
-        # Create structural nodes in state document, to be filled during processing
+        # Determine if the timestamp on any dependencies is newer than the output
         #--
-        for node_name in ['exports', 'depends', 'children']:
-            new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
-            self.state_node.appendChild(new_node)
-            setattr(self, node_name + '_node', new_node)
+        if not force:
+            abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
+            build_time = os.stat(abs_output_file).st_mtime
+            deps = [self.file_name] + [get_text(x) for x in self.state_node.xpath('depends/depend')]
+            changed = any(os.stat(self.abs_in_path(d)).st_mtime > build_time for d in deps)
+            if not changed:
+                return False
+
+        if self.project.options.verbose:
+            print "Building " + self.file_name
 
         #--
         # Run the XSLT processor
         #--
-        input = InputSource.DefaultFactory.fromUri(OsPathToUri(self.project.in_root + self.file_name))
-        self.project.processor.extensionParams[(NAMESPACE, 'context')] = self
-        output = self.project.processor.run(input)
+        self.old_state_node.parentNode.insertBefore(self.state_node, self.old_state_node)
+        self.old_state_node.parentNode.removeChild(self.old_state_node)
+        try:
+            input = InputSource.DefaultFactory.fromUri(OsPathToUri(self.project.in_root + self.file_name))
+            self.project.processor.extensionParams[(NAMESPACE, 'context')] = self
+            output = self.project.processor.run(input)
+        except:
+            self.state_node.parentNode.insertBefore(self.old_state_node, self.state_node)
+            self.state_node.parentNode.removeChild(self.state_node)
+            raise
 
         #--
         # Determine the output file name and write output to it
@@ -193,73 +223,34 @@ class PippFile(object):
         output_fh.close()
 
         #--
-        # Process all this file's children. If the child already has child nodes in
-        # the state dom, it is a "child-file" and not processed.
+        # Determine if any exported state was changed
         #--
-        if do_children:
-            for child in self.children_node.childNodes:
-                if not child.hasChildNodes():
-                    PippFile(self.project, child).build(do_children=True)
+        old_exports = dict((x.tagName, get_text(x)) for x in self.old_state_node.xpath('exports/*'))
+        new_exports = dict((x.tagName, get_text(x)) for x in self.state_node.xpath('exports/*'))            
+        old_children = [Conversions.StringValue(x) for x in self.old_state_node.xpath('children/page/@src')]
+        new_children = [Conversions.StringValue(x) for x in self.state_node.xpath('children/page/@src')]
+        if old_exports != new_exports or old_children != new_children:
+            self.project.state_changed = True
 
-    #--
-    # If any dependent files have a newer modification time than the target, rebuild
-    #--
-    def cond_build(self):    
-        abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
-        build_time = os.stat(abs_output_file).st_mtime
-        deps = [self.file_name] + [get_text(x) for x in self.state_node.xpath('depends/depend')]
-        if any(os.stat(self.abs_in_path(d)).st_mtime > build_time for d in deps):
-
-            new_state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-            new_state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)
-            self.state_node.parentNode.insertBefore(new_state_node, self.state_node)
-            old_state_node = self.state_node
-            self.state_node = new_state_node
-            try:                
-                self.build()
-            except:
-                old_state_node.parentNode.removeChild(new_state_node)
-                self.state_node = old_state_node
-                raise            
-
-            #--
-            # Merge new state data into the tree
-            #--
-            cn = new_state_node.xpath('children')[0]
-            for x in list(cn.childNodes):
-                cn.removeChild(x)
-            pcn = old_state_node.xpath('children')[0]
-            for x in list(pcn.childNodes):
-                cn.appendChild(x)                
-            new_state_node.parentNode.removeChild(old_state_node)
-            return new_state_node
+        #--
+        # Build children as appropriate
+        #--        
+        children_map = dict((x.getAttributeNS(EMPTY_NAMESPACE, 'src'), x) for x in self.old_state_node.xpath('children/page'))
+        for skel_node in list(self.state_node.xpath('children/page')):
+            file_name = skel_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
+            full_node = children_map.get(file_name)
+            isnew = not bool(full_node)
+            if isnew:
+                full_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+                full_node.setAttributeNS(EMPTY_NAMESPACE, 'src', file_name)
+            skel_node.parentNode.insertBefore(full_node, skel_node)
+            skel_node.parentNode.removeChild(skel_node)
+            if (isnew or force) and file_name.endswith('.pip'):
+                PippFile(self.project, full_node).build(force)
+            
+        return True
 
 
-#--
-# Run as a webserver that outputs the selected project, rebuilding output
-# files on demand.
-#--
-class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
-    def log_request(self, code, size=None):
-        pass
-
-    def do_GET(self):      
-        try:
-            if self.path.endswith('.html'):
-                path = re.sub('.html$', '.pip', self.path)
-                # Note: risk of xpath injection here; removing single quotes should protect
-                nodes = self.server.pipp_project.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
-                if nodes:
-                    if PippFile(self.server.pipp_project, nodes[0]).cond_build():
-                        self.server.pipp_project.write_state()
-            SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
-        except:
-            self.send_response(500)
-            self.send_header("Content-type", 'text/plain')
-            self.end_headers()
-            self.wfile.write(traceback.format_exc())
-
-    
 #--
 # Main entry point - parse the command line
 #--
@@ -272,15 +263,21 @@ parser.add_option("-l", "--listen", dest="listen", default='127.0.0.1',
         help='Specify the listening address for the web server (default %default)')
 parser.add_option("-f", "--full", dest="full", action='store_true',
         help='Initiate a full rebuild of the project')
+parser.add_option("-v", "--verbose", dest="verbose", action='store_true',
+        help='Produce more verbose output')
 
 (options, args) = parser.parse_args()
 if len(args) != 1:
     parser.print_help()
 else:
     in_root = os.path.join(os.getcwd(), args[0])
+    prj = PippProject(in_root, options)
     if options.full:
-        PippProject(in_root, True).build_full()
+        prj.build_full()
+    elif prj.new_project:
+        print "Project's first use - initiating full build"
+        prj.build_full()
     if options.serve:
-        PippProject(in_root, False).serve(listen=(options.listen, options.port))
+        prj.serve(listen=(options.listen, options.port))
     if not options.full and not options.serve:
-        PippProject(in_root, False).build()
+        prj.build()
