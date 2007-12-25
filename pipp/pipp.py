@@ -22,7 +22,7 @@ class PippProject(object):
         # Parse the project definition
         #--
         self.options = options
-        self.in_root = in_root.rstrip('/\\.') # TBD!!!!
+        self.in_root = in_root.rstrip('/\\')
         self.out_root = os.path.join(self.in_root, 'out')
         self.index = '/index.pip'
         self.stylesheet_fname = '/pipp.xsl'
@@ -30,8 +30,9 @@ class PippProject(object):
         self.state_changed = False
         self.new_project = not os.path.exists(self.state_xml)
         if self.new_project:
-            open(self.state_xml, 'w').write('<page/>')
-        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
+            self.state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
+        else:
+            self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
 
         #--
         # Create the XSLT processor
@@ -40,8 +41,6 @@ class PippProject(object):
         self.processor.registerExtensionModules(['pipp_xslt'])
         stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(self.in_root + self.stylesheet_fname))
         self.processor.appendStylesheet(stylesheet)
-
-
 
     #--
     # Write the state DOM over the previous state XML
@@ -133,13 +132,6 @@ class PippFile(object):
         self.file_name = old_state_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
         self.out_file = re.sub('\.pip$', '.html', self.file_name)
         
-        self.state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-        self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)        
-        for node_name in ['exports', 'depends', 'children']:
-            new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
-            self.state_node.appendChild(new_node)
-            setattr(self, node_name + '_node', new_node)
-
     @property
     def in_root(self):
         return self.project.in_root
@@ -174,6 +166,8 @@ class PippFile(object):
     # Add a dependency
     #--
     def add_depends(self, file_name):
+        if file_name == self.file_name:
+            return
         for node in self.depends_node.childNodes:
             if file_name == get_text(node):
                 return
@@ -181,8 +175,20 @@ class PippFile(object):
         new_node.appendChild(self.project.state_doc.createTextNode(file_name))
         self.depends_node.appendChild(new_node)
 
+    def add_edepends(self, file_name, export):
+        if file_name == self.file_name:
+            return
+        comb = file_name + ':' + export
+        if self.edepends_node.xpath("depend[text() = '%s']" % comb.replace("'", "")):
+            return
+        new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, 'depend')
+        new_node.appendChild(self.project.state_doc.createTextNode(comb))
+        self.edepends_node.appendChild(new_node)
+
     #--
-    # Process a .pip file
+    # Process a .pip file. Returns true/false depending on whether the file was
+    # actually processed. Recursively processes any new children, and in "force" is
+    # specified, any existing children as well.
     #--
     def build(self, force=False):
 
@@ -191,14 +197,25 @@ class PippFile(object):
         #--
         if not force:
             abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
-            build_time = os.stat(abs_output_file).st_mtime
-            deps = [self.file_name] + [get_text(x) for x in self.state_node.xpath('depends/depend')]
-            changed = any(os.stat(self.abs_in_path(d)).st_mtime > build_time for d in deps)
-            if not changed:
-                return False
+            if os.path.exists(abs_output_file):
+                build_time = os.stat(abs_output_file).st_mtime
+                deps = [self.file_name] + [get_text(x) for x in self.old_state_node.xpath('depends/depend')]
+                changed = any(os.stat(self.abs_in_path(d)).st_mtime > build_time for d in deps)
+                if not changed:
+                    return False
 
         if self.project.options.verbose:
             print "Building " + self.file_name
+
+        #--
+        # Prepare the new state node
+        #--
+        self.state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
+        self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)        
+        for node_name in ['exports', 'depends', 'edepends', 'children']:
+            new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
+            self.state_node.appendChild(new_node)
+            setattr(self, node_name + '_node', new_node)
 
         #--
         # Run the XSLT processor
@@ -270,7 +287,10 @@ parser.add_option("-v", "--verbose", dest="verbose", action='store_true',
 if len(args) != 1:
     parser.print_help()
 else:
-    in_root = os.path.join(os.getcwd(), args[0])
+    if args[0] == '.':
+        in_root = os.getcwd()
+    else:
+        in_root = os.path.join(os.getcwd(), args[0])
     prj = PippProject(in_root, options)
     if options.full:
         prj.build_full()

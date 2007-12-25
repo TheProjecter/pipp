@@ -107,10 +107,10 @@ def pipp_import(context, name):
     name = Conversions.StringValue(name)
     cur_doc = ctx.state_node
     while cur_doc:
-        cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
-        for node in cur_exp.childNodes:
-            if getattr(node, 'tagName', None) == name:
-                return get_text(node)
+        ctx.add_edepends(cur_doc.getAttributeNS(EMPTY_NAMESPACE, 'src'), name)
+        nodes = cur_doc.xpath("exports/*[name()='%s']" % name.replace("'", ""))
+        if nodes:
+            return get_text(nodes[0])
         cur_doc = cur_doc.parentNode.parentNode
     raise Exception("Import not found")
 
@@ -125,10 +125,10 @@ def pipp_import_join(context, name, join_str):
     cur_doc = ctx.state_node
     values = []
     while cur_doc:
-        cur_exp = [x for x in cur_doc.childNodes if getattr(x, 'tagName', None) == 'exports'][0]
-        for node in cur_exp.childNodes:
-            if getattr(node, 'tagName', None) == name:
-                values.insert(0, get_text(node))
+        ctx.add_edepends(cur_doc.getAttributeNS(EMPTY_NAMESPACE, 'src'), name)
+        nodes = cur_doc.xpath("exports/*[name()='%s']" % name.replace("'", ""))
+        if nodes:
+            values.insert(0, get_text(nodes[0]))
         cur_doc = cur_doc.parentNode.parentNode
     return Conversions.StringValue(join_str).join(values)
 
