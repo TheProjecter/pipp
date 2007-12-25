@@ -133,6 +133,13 @@ def pipp_import_join(context, name, join_str):
     return Conversions.StringValue(join_str).join(values)
 
 #--
+# Add a dependency on an exported variable
+#--
+def pipp_export_depend(context, src, export):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx.add_edepends(Conversions.StringValue(src), Conversions.StringValue(export))
+
+#--
 # Create a view of the site map. This runs an XSLT stylesheet against the XML
 # state file.
 #--
@@ -337,6 +344,7 @@ ExtFunctions = \
     (NAMESPACE, 'export'):          pipp_export,
     (NAMESPACE, 'import'):          pipp_import,
     (NAMESPACE, 'import-join'):     pipp_import_join,
+    (NAMESPACE, 'export-depend'):   pipp_export_depend,
     (NAMESPACE, 'map-view'):        pipp_map_view,
 
     (NAMESPACE, 'file-name'):       pipp_file_name,
