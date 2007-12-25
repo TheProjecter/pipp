@@ -27,7 +27,6 @@ class PippProject(object):
         self.index = '/index.pip'
         self.stylesheet_fname = '/pipp.xsl'
         self.state_xml = os.path.join(in_root, 'pipp.xml')
-        self.page_tree_changed = False
         self.changed_exports = []
         self.new_project = not os.path.exists(self.state_xml)
         if self.new_project:
@@ -50,18 +49,15 @@ class PippProject(object):
         state_file = open(self.state_xml, 'w')
         PrettyPrint(self.state_doc.documentElement, state_file)
         state_file.close()
-
-        if self.page_tree_changed:
-            print "Page tree has changed - initiating full rebuild"
-            self.build_full()
             
-        elif self.changed_exports:
+        if self.changed_exports:
             rebuild_pages = set()
             for ch in self.changed_exports:
                 nodes = self.state_doc.xpath("//page[edepends/depend[text() = '%s']]" % ch.replace("'", ""))
                 rebuild_pages = rebuild_pages.union(nodes)
             for page in rebuild_pages:
                 PippFile(self, page).build(force=True, force_children=False)
+            self.changed_exports = []
 
     #--
     # Given an absolute input path, return the absolute output path. If the output
@@ -83,7 +79,6 @@ class PippProject(object):
     # Full build of a project. Process the index page and recurse.
     #--
     def build_full(self):
-        self.page_tree_changed = False
         self.changed_exports = []
         state_node = self.state_doc.documentElement
         state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.index)
@@ -267,7 +262,7 @@ class PippFile(object):
         old_children = [Conversions.StringValue(x) for x in self.old_state_node.xpath('children/page/@src')]
         new_children = [Conversions.StringValue(x) for x in self.state_node.xpath('children/page/@src')]
         if old_children != new_children:
-            self.project.page_tree_changed = True
+            self.project.changed_exports.append('%s:children' % self.file_name)
 
         #--
         # Build children as appropriate
@@ -283,7 +278,7 @@ class PippFile(object):
             skel_node.parentNode.insertBefore(full_node, skel_node)
             skel_node.parentNode.removeChild(skel_node)
             if (isnew or force_children) and file_name.endswith('.pip'):
-                PippFile(self.project, full_node).build(force)
+                PippFile(self.project, full_node).build(force or isnew, force_children)
             
         return True
 
