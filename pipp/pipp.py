@@ -114,6 +114,8 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def do_GET(self):      
         try:
+            if self.path.endswith('/'):
+                self.path += '.html'
             if self.path.endswith('.html'):
                 path = re.sub('.html$', '.pip', self.path)
                 nodes = self.server.pipp_project.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
@@ -288,7 +290,7 @@ class PippFile(object):
 #--
 parser = OptionParser(usage="usage: %prog [options] project_root")
 parser.add_option("-s", "--serve", dest="serve", action='store_true',
-        help='Start a web server that publishes the project')
+        help='Start a web server that serves the project; this is useful for development')
 parser.add_option("-p", "--port", dest="port", type='int', default=8080,
         help='Specify port for the web server (default %default)')
 parser.add_option("-l", "--listen", dest="listen", default='127.0.0.1',
