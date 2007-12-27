@@ -160,7 +160,9 @@ def pipp_map_view(context, xslt_file):
     # Run the processor against state.xml and return the output.
     #--
     input = InputSource.DefaultFactory.fromUri(OsPathToUri(ctx.state_xml))
-    return processors[xslt_file].run(input)
+    return processors[xslt_file].run(input)    
+    # TBD: running off in-memory DOM would be preferable, but causes problems
+    #return processors[xslt_file].runNode(ctx.state_doc)
 
 #--
 # Get the current file name.
