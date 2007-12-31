@@ -9,6 +9,9 @@ from Ft.Lib.Uri import OsPathToUri
 from pipp_utils import *
 import os, re, string, time, glob, stat, shutil
 import Image, ImageDraw, ImageFont
+from pygments import highlight
+from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
+from pygments.formatters import HtmlFormatter
 
 #--
 # Caches
@@ -204,23 +207,28 @@ def pipp_relative_path(context, link):
 # Render source code as syntax highlighted HTML. This works by calling the
 # perl script "code2html".
 #--
-def pipp_code(context, src):
+def pipp_code(context, src, lexer, docss):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-    abs_src = ctx.abs_in_path(Conversions.StringValue(src))
+    src = Conversions.StringValue(src)
+    fname = os.path.basename(src)
+    abs_src = ctx.abs_in_path(src)
     ctx.add_depends(abs_src[len(ctx.in_root):])
 
-    code2html_cmd = '%s/code2html -o html-css %s' % (pipp_dir, abs_src)
-    if os.name == 'nt':
-        code2html_cmd = perl_cmd + ' ' + code2html_cmd
+    lexer = Conversions.StringValue(lexer)
+    if lexer:
+        lexer = get_lexer_by_name(lexer)
     else:
-        code2html_cmd += ' 2>/dev/null'
+        lexer = get_lexer_for_filename(fname)
+    
+    formatter = HtmlFormatter(cssclass="source")
+    result = highlight(open(abs_src).read(), lexer, formatter)
+    if Conversions.StringValue(docss) == '1':
+        result = '<link rel="stylesheet" href="%s.css"/>' % fname + result
+        css = open(ctx.abs_out_path(ctx.abs_in_path(fname + '.css')), 'w')
+        css.write(formatter.get_style_defs())
+        css.close()
 
-    pipe = os.popen(code2html_cmd)
-    code_html = pipe.read()
-    rc = pipe.close()
-    if rc is not None:
-        raise Exception('code2html failed: %d' % rc)
-    return code_html
+    return result
 
 #--
 # Functions to determine the width and height of an image file, using PIL.

@@ -47,7 +47,7 @@
 </xsl:template>
 
 <xsl:template match="pipp-code">
-    <xsl:value-of disable-output-escaping="yes" select="pipp:code(@src)"/>
+    <xsl:value-of disable-output-escaping="yes" select="pipp:code(@src, @lexer, @docss)"/>
 </xsl:template>
 
 <xsl:template match="pipp-map-view">
