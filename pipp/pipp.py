@@ -12,6 +12,7 @@ from Ft.Xml.XPath import Compile, Conversions
 import re, os, sys, BaseHTTPServer, SimpleHTTPServer, traceback
 from optparse import OptionParser
 from pipp_utils import *
+import pipp_xslt
 
 
 class PippProject(object):
@@ -122,6 +123,10 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
                 if nodes:
                     if PippFile(self.server.pipp_project, nodes[0]).build(force=False):
                         self.server.pipp_project.write_state()
+                        # Reset caches inside pipp_xslt
+                        pipp_xslt.images = {}
+                        pipp_xslt.processors = {}
+                        pipp_xslt.files = {}                        
             SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
         except:
             self.send_response(500)
