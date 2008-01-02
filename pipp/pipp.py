@@ -31,9 +31,8 @@ class PippProject(object):
         self.changed_exports = []
         self.new_project = not os.path.exists(self.state_xml)
         if self.new_project:
-            self.state_doc = NonvalidatingReader.parseString('<page/>', 'abc')
-        else:
-            self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
+            open(self.state_xml, 'w').write('<page/>')
+        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
 
         #--
         # Create the XSLT processor
@@ -112,6 +111,12 @@ class PippProject(object):
 class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
     def log_request(self, code, size=None):
         pass
+
+    def log_error(self, format, *args):
+        if args and args[0] == 404 and self.path == '/favicon.ico':
+            return
+        format += ', path ' + self.path
+        self.log_message(format, *args)
 
     def do_GET(self):      
         try:
