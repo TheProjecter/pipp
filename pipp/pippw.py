@@ -1,9 +1,13 @@
-import wx, wx.xrc, sys, re, socket, os, threading
+import wx, wx.xrc, sys, re, socket, os, threading, webbrowser
 from wx.xrc import XRCCTRL
 import pipp
 
 
-app = wx.PySimpleApp()
+class Options(object):
+    verbose = True
+    path = None
+options = Options()
+server = None
 
 class PippTaskBarIcon(wx.TaskBarIcon):
     def __init__(self, *args, **kwargs):
@@ -12,6 +16,11 @@ class PippTaskBarIcon(wx.TaskBarIcon):
         
     def CreatePopupMenu(self):
         menu = res.LoadMenu('popup_menu')
+        global options
+        if not options.path:
+            for item in menu.GetMenuItems():
+                if item.GetId() in (2, 3):
+                    item.Enable(False)
         wx.EVT_MENU(menu, 1, self.options)
         wx.EVT_MENU(menu, 2, self.browser)
         wx.EVT_MENU(menu, 3, self.rebuild)
@@ -24,13 +33,15 @@ class PippTaskBarIcon(wx.TaskBarIcon):
         wx.EVT_BUTTON(panel, 1, browse_folders)
         wx.EVT_BUTTON(panel, 2, options_ok)
         wx.EVT_BUTTON(panel, 3, options_cancel)
+        if options.path:
+            XRCCTRL(panel, 'path').SetValue(options.path)
         panel.Show()
 
     def browser(self, event):
-        pass
+        webbrowser.open('http://%s:%d/index.html' % (options.listen, options.port))
 
     def rebuild(self, event):
-        pass
+        server.project.build_full()
 
     def exit(self, event):
         self.RemoveIcon()
@@ -74,17 +85,15 @@ def options_ok(event):
         msg.ShowModal()
         return
         
-    # Activate
-    # Stop previous pipp server
-    
-    class Options(object):
-        verbose = False
+    # Activate    
     global options
-    options = Options()
     options.port = port
     options.listen = listen
     options.path = path    
-    PippServer(options).start()
+    
+    global server
+    server = PippServer(options)
+    server.start()
         
     panel.Close()
 
@@ -95,17 +104,18 @@ class PippServer(threading.Thread):
         self.options = options
         
     def run(self):        
-        project = pipp.PippProject(self.options.path, self.options)
-        project.serve((self.options.listen, self.options.port))
+        self.project = pipp.PippProject(self.options.path, self.options)
+        if self.project.new_project:
+            self.project.build_full()
+        self.project.serve((self.options.listen, self.options.port))
     
 
 def options_cancel(event):
     panel.Close()
 
 
+app = wx.PySimpleApp()
 res = wx.xrc.EmptyXmlResource()
 res.Load('pipp.xrc')
-
 icon = PippTaskBarIcon()
-
 app.MainLoop()

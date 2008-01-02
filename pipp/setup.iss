@@ -19,14 +19,19 @@ ChangesEnvironment=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "C:\paj\pipp\dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "C:\paj\pipp\pipp-core.xsl"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+;Source: "C:\paj\pipp\dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "C:\paj\pipp\example\*"; DestDir: "{app}\example"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Tasks]
-Name: Path; Description: Add Pipp to the system PATH
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
+Name: "syspath"; Description: "Add Pipp to the system &PATH"; Flags: unchecked
 
 [Run]
-Filename: "{app}\addtopath.exe"; Parameters: """{app}"""; Tasks: Path
+Filename: "{app}\addtopath.exe"; Parameters: """{app}"""; Tasks: syspath
+Filename: "{app}\pippw.exe"; Description: "{cm:LaunchProgram,Pipp}"; Flags: nowait postinstall skipifsilent
 
+[Icons]
+Name: "{group}\My Program"; Filename: "{app}\MyProg.exe"
+Name: "{group}\{cm:UninstallProgram,My Program}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\My Program"; Filename: "{app}\MyProg.exe"; Tasks: desktopicon

@@ -55,6 +55,7 @@
       <object class="sizeritem">
         <object class="wxCheckBox">
           <label>Start automatically on system startup</label>
+          <hidden>1</hidden>
         </object>
         <flag>wxBOTTOM|wxLEFT|wxRIGHT</flag>
         <border>5</border>
