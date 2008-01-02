@@ -1,5 +1,6 @@
 #--
 # Adds the given directory to system path
+# This is used by the Windows installer
 #--
 import sys
 from _winreg import *
