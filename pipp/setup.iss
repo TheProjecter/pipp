@@ -32,6 +32,6 @@ Filename: "{app}\addtopath.exe"; Parameters: """{app}"""; Tasks: syspath
 Filename: "{app}\pippw.exe"; Description: "{cm:LaunchProgram,Pipp}"; Flags: nowait postinstall skipifsilent
 
 [Icons]
-Name: "{group}\My Program"; Filename: "{app}\MyProg.exe"
-Name: "{group}\{cm:UninstallProgram,My Program}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\My Program"; Filename: "{app}\MyProg.exe"; Tasks: desktopicon
+Name: "{group}\Pipp"; Filename: "{app}\pippw.exe"
+Name: "{group}\{cm:UninstallProgram,Pipp}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\Pipp"; Filename: "{app}\pippw.exe"; Tasks: desktopicon
