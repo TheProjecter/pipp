@@ -32,15 +32,20 @@ class PippProject(object):
         self.new_project = not os.path.exists(self.state_xml)
         if self.new_project:
             open(self.state_xml, 'w').write('<page/>')
-        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
+        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))        
+        self._processor = None
 
-        #--
-        # Create the XSLT processor
-        #--
-        self.processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
-        self.processor.registerExtensionModules(['pipp_xslt'])
-        stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(self.in_root + self.stylesheet_fname))
-        self.processor.appendStylesheet(stylesheet)
+    #--
+    # Create the XSLT processor
+    #--
+    @property
+    def processor(self):
+        if not self._processor:
+            self.processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
+            self.processor.registerExtensionModules(['pipp_xslt'])
+            stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(self.in_root + self.stylesheet_fname))
+            self.processor.appendStylesheet(stylesheet)
+        return self._processor
 
     #--
     # Write the state DOM over the previous state XML
@@ -128,10 +133,11 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
                 if nodes:
                     if PippFile(self.server.pipp_project, nodes[0]).build(force=False):
                         self.server.pipp_project.write_state()
-                        # Reset caches inside pipp_xslt
+                        # Avoid any state being stored between requests
                         pipp_xslt.images = {}
                         pipp_xslt.processors = {}
-                        pipp_xslt.files = {}                        
+                        pipp_xslt.files = {}
+                        self.server.pipp_project._processor = None
             SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
         except:
             self.send_response(500)
@@ -233,6 +239,7 @@ class PippFile(object):
             new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
             self.state_node.appendChild(new_node)
             setattr(self, node_name + '_node', new_node)
+        self.add_depends(self.project.stylesheet_fname)
 
         #--
         # Run the XSLT processor

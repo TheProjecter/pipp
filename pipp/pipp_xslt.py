@@ -153,6 +153,7 @@ def pipp_map_view(context, xslt_file):
     # Create the XSLT processor object. For efficiency there is a cache of these.
     #--
     xslt_file = ctx.abs_in_path(Conversions.StringValue(xslt_file))
+    ctx.add_depends(xslt_file[len(ctx.in_root):])
     if not processors.has_key(xslt_file):
         processors[xslt_file]= Processor.Processor()
         processors[xslt_file].registerExtensionModules(['pipp_xslt'])
