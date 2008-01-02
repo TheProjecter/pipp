@@ -41,10 +41,10 @@ class PippProject(object):
     @property
     def processor(self):
         if not self._processor:
-            self.processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
-            self.processor.registerExtensionModules(['pipp_xslt'])
+            self._processor = Processor.Processor(stylesheetAltUris = [OsPathToUri(pipp_dir + os.path.sep)])
+            self._processor.registerExtensionModules(['pipp_xslt'])
             stylesheet = InputSource.DefaultFactory.fromUri(OsPathToUri(self.in_root + self.stylesheet_fname))
-            self.processor.appendStylesheet(stylesheet)
+            self._processor.appendStylesheet(stylesheet)
         return self._processor
 
     #--
