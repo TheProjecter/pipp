@@ -307,10 +307,10 @@ class PippFile(object):
             full_node = children_map.get(file_name)
             isnew = not bool(full_node)
             if isnew:
-                full_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-                full_node.setAttributeNS(EMPTY_NAMESPACE, 'src', file_name)
-            skel_node.parentNode.insertBefore(full_node, skel_node)
-            skel_node.parentNode.removeChild(skel_node)
+                full_node = skel_node
+            else:
+                skel_node.parentNode.insertBefore(full_node, skel_node)
+                skel_node.parentNode.removeChild(skel_node)
             if (isnew or force_children) and file_name.endswith('.pip'):
                 PippFile(self.project, full_node).build(force or isnew, force_children)
             
