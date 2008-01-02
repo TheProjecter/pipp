@@ -19,12 +19,13 @@ class PippTaskBarIcon(wx.TaskBarIcon):
         global options
         if not options.path:
             for item in menu.GetMenuItems():
-                if item.GetId() in (2, 3):
+                if item.GetId() in (2, 3, 5):
                     item.Enable(False)
         wx.EVT_MENU(menu, 1, self.options)
         wx.EVT_MENU(menu, 2, self.browser)
         wx.EVT_MENU(menu, 3, self.rebuild)
         wx.EVT_MENU(menu, 4, self.exit)
+        wx.EVT_MENU(menu, 5, self.explore)
         return menu
 
     def options(self, event):
@@ -46,6 +47,9 @@ class PippTaskBarIcon(wx.TaskBarIcon):
     def exit(self, event):
         self.RemoveIcon()
         sys.exit()
+
+    def explore(self, event):
+        os.system('explorer ' + options.path)
 
 
 def browse_folders(event):

@@ -92,6 +92,9 @@
     <object class="wxMenuItem" name="2">
       <label>Launch Browser</label>
     </object>
+    <object class="wxMenuItem" name="5">
+      <label>Explore Source</label>
+    </object>
     <object class="wxMenuItem" name="3">
       <label>Full Rebuild</label>
     </object>
