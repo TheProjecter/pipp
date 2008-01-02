@@ -108,6 +108,9 @@ class PippProject(object):
         print "Serving project at http://%s:%d/" % listen
         httpd.serve_forever()
 
+    def get_state_node(self, path):
+        nodes = self.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
+        return nodes and nodes[0] or None
 
 #--
 # Run as a webserver that outputs the selected project, rebuilding output
@@ -123,21 +126,33 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
         format += ', path ' + self.path
         self.log_message(format, *args)
 
-    def do_GET(self):      
+    def do_GET(self):
+        project = self.server.pipp_project
         try:
             if self.path.endswith('/'):
                 self.path += '.html'
             if self.path.endswith('.html'):
-                path = re.sub('.html$', '.pip', self.path)
-                nodes = self.server.pipp_project.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
-                if nodes:
-                    if PippFile(self.server.pipp_project, nodes[0]).build(force=False):
-                        self.server.pipp_project.write_state()
+                node = project.get_state_node(re.sub('.html$', '.pip', self.path))
+                if node:
+                    checked = {}
+                    any_built = False
+                    for n in node.xpath('edepends/depend'):
+                        fname = get_text(n).split(':')[0]
+                        if not checked.has_key(fname):
+                            abs_in = project.abs_in_path(fname)
+                            abs_out = re.sub('.pip$', '.html', project.abs_out_path(abs_in))
+                            if os.stat(abs_in).st_mtime > os.stat(abs_out).st_mtime:
+                                PippFile(project, project.get_state_node(fname)).build(force=True)
+                                any_built = True
+                            checked[fname] = 1
+                    any_built = any_built or PippFile(project, node).build(force=False)                    
+                    if any_built:
+                        project.write_state()
                         # Avoid any state being stored between requests
                         pipp_xslt.images = {}
                         pipp_xslt.processors = {}
                         pipp_xslt.files = {}
-                        self.server.pipp_project._processor = None
+                        project._processor = None
             SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
         except:
             self.send_response(500)
