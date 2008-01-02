@@ -320,33 +320,34 @@ class PippFile(object):
 #--
 # Main entry point - parse the command line
 #--
-parser = OptionParser(usage="usage: %prog [options] project_root")
-parser.add_option("-s", "--serve", dest="serve", action='store_true',
-        help='Start a web server that serves the project; this is useful for development')
-parser.add_option("-p", "--port", dest="port", type='int', default=8080,
-        help='Specify port for the web server (default %default)')
-parser.add_option("-l", "--listen", dest="listen", default='127.0.0.1',
-        help='Specify the listening address for the web server (default %default)')
-parser.add_option("-f", "--full", dest="full", action='store_true',
-        help='Initiate a full rebuild of the project')
-parser.add_option("-v", "--verbose", dest="verbose", action='store_true',
-        help='Produce more verbose output')
+if __name__ == '__main__':
+    parser = OptionParser(usage="usage: %prog [options] project_root")
+    parser.add_option("-s", "--serve", dest="serve", action='store_true',
+            help='Start a web server that serves the project; this is useful for development')
+    parser.add_option("-p", "--port", dest="port", type='int', default=8080,
+            help='Specify port for the web server (default %default)')
+    parser.add_option("-l", "--listen", dest="listen", default='127.0.0.1',
+            help='Specify the listening address for the web server (default %default)')
+    parser.add_option("-f", "--full", dest="full", action='store_true',
+            help='Initiate a full rebuild of the project')
+    parser.add_option("-v", "--verbose", dest="verbose", action='store_true',
+            help='Produce more verbose output')
 
-(options, args) = parser.parse_args()
-if len(args) != 1:
-    parser.print_help()
-else:
-    if args[0] == '.':
-        in_root = os.getcwd()
+    (options, args) = parser.parse_args()
+    if len(args) != 1:
+        parser.print_help()
     else:
-        in_root = os.path.join(os.getcwd(), args[0])
-    prj = PippProject(in_root, options)
-    if options.full:
-        prj.build_full()
-    elif prj.new_project:
-        print "Project's first use - initiating full build"
-        prj.build_full()
-    if options.serve:
-        prj.serve(listen=(options.listen, options.port))
-    if not options.full and not options.serve:
-        prj.build()
+        if args[0] == '.':
+            in_root = os.getcwd()
+        else:
+            in_root = os.path.join(os.getcwd(), args[0])
+        prj = PippProject(in_root, options)
+        if options.full:
+            prj.build_full()
+        elif prj.new_project:
+            print "Project's first use - initiating full build"
+            prj.build_full()
+        if options.serve:
+            prj.serve(listen=(options.listen, options.port))
+        if not options.full and not options.serve:
+            prj.build()

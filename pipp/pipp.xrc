@@ -1,0 +1,101 @@
+<?xml version="1.0" ?>
+<resource>
+  <object class="wxDialog" name="options">
+    <object class="wxBoxSizer">
+      <orient>wxVERTICAL</orient>
+      <object class="sizeritem">
+        <object class="wxFlexGridSizer">
+          <object class="sizeritem">
+            <object class="wxStaticText">
+              <size>100,22</size>
+              <label>Project path</label>
+            </object>
+          </object>
+          <object class="sizeritem">
+            <object class="wxTextCtrl" name="path">
+              <size>200,22</size>
+            </object>
+          </object>
+          <object class="sizeritem">
+            <object class="wxButton" name="1">
+              <size>25,22</size>
+              <label>...</label>
+            </object>
+          </object>
+          <object class="sizeritem">
+            <object class="wxStaticText">
+              <label>Server port</label>
+            </object>
+          </object>
+          <object class="sizeritem">
+            <object class="wxTextCtrl" name="port">
+              <size>50,22</size>
+              <value>8080</value>
+            </object>
+          </object>
+          <object class="spacer"/>
+          <object class="sizeritem">
+            <object class="wxStaticText">
+              <label>Server address</label>
+            </object>
+          </object>
+          <object class="sizeritem">
+            <object class="wxTextCtrl" name="listen">
+              <value>127.0.0.1</value>
+            </object>
+          </object>
+          <cols>3</cols>
+          <rows>2</rows>
+          <vgap>5</vgap>
+          <hgap>5</hgap>
+        </object>
+        <flag>wxALL</flag>
+        <border>5</border>
+      </object>
+      <object class="sizeritem">
+        <object class="wxCheckBox">
+          <label>Start automatically on system startup</label>
+        </object>
+        <flag>wxBOTTOM|wxLEFT|wxRIGHT</flag>
+        <border>5</border>
+      </object>
+      <object class="spacer">
+        <size>10</size>
+      </object>
+      <object class="sizeritem">
+        <object class="wxBoxSizer">
+          <object class="sizeritem">
+            <object class="wxButton" name="2">
+              <label>Ok</label>
+            </object>
+            <flag>wxRIGHT</flag>
+            <border>10</border>
+          </object>
+          <object class="sizeritem">
+            <object class="wxButton" name="3">
+              <label>Cancel</label>
+            </object>
+          </object>
+          <orient>wxHORIZONTAL</orient>
+        </object>
+        <flag>wxBOTTOM|wxALIGN_CENTRE</flag>
+        <border>5</border>
+      </object>
+    </object>
+    <title>Pipp Options</title>
+  </object>
+  <object class="wxMenu" name="popup_menu">
+    <object class="wxMenuItem" name="1">
+      <label>Options...</label>
+    </object>
+    <object class="wxMenuItem" name="2">
+      <label>Launch Browser</label>
+    </object>
+    <object class="wxMenuItem" name="3">
+      <label>Full Rebuild</label>
+    </object>
+    <object class="wxMenuItem" name="4">
+      <label>Exit</label>
+    </object>
+  </object>
+</resource>
