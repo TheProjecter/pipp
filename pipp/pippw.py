@@ -1,13 +1,14 @@
-import wx, wx.xrc, sys, re, socket, os, threading, webbrowser
+import wx, wx.xrc, sys, re, socket, os, threading, webbrowser, _winreg
 from wx.xrc import XRCCTRL
 import pipp
 
-
+prog_dir = hasattr(sys, 'frozen') and sys.executable or sys.argv[0]
 class Options(object):
     verbose = True
-    path = None
+    path = os.path.join(os.path.dirname(prog_dir), 'example')
+    port = 8080
+    listen = '127.0.0.1'
 options = Options()
-server = None
 
 class PippTaskBarIcon(wx.TaskBarIcon):
     def __init__(self, *args, **kwargs):
@@ -30,14 +31,8 @@ class PippTaskBarIcon(wx.TaskBarIcon):
 
     def options(self, event):
         global panel
-        panel = res.LoadDialog(None, 'options')
-        wx.EVT_BUTTON(panel, 1, browse_folders)
-        wx.EVT_BUTTON(panel, 2, options_ok)
-        wx.EVT_BUTTON(panel, 3, options_cancel)
-        if options.path:
-            XRCCTRL(panel, 'path').SetValue(options.path)
         panel.Show()
-
+                
     def browser(self, event):
         webbrowser.open('http://%s:%d/index.html' % (options.listen, options.port))
 
@@ -94,6 +89,10 @@ def options_ok(event):
     options.port = port
     options.listen = listen
     options.path = path    
+
+    _winreg.SetValueEx(regkey, 'Port', 0, _winreg.REG_SZ, str(port))
+    _winreg.SetValueEx(regkey, 'Listen', 0, _winreg.REG_SZ, listen)
+    _winreg.SetValueEx(regkey, 'Path', 0, _winreg.REG_SZ, path)
     
     global server
     server = PippServer(options)
@@ -121,5 +120,36 @@ def options_cancel(event):
 app = wx.PySimpleApp()
 res = wx.xrc.EmptyXmlResource()
 res.Load('pipp.xrc')
+
+panel = res.LoadDialog(None, 'options')
+wx.EVT_BUTTON(panel, 1, browse_folders)
+wx.EVT_BUTTON(panel, 2, options_ok)
+wx.EVT_BUTTON(panel, 3, options_cancel)
+
+try:
+    regkey = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, 'Software\\Pajhome\\Pipp', 0, _winreg.KEY_ALL_ACCESS)
+except WindowsError:
+    regkey = _winreg.CreateKey(_winreg.HKEY_CURRENT_USER, 'Software\\Pajhome\\Pipp')        
+try:
+    options.path,_ = _winreg.QueryValueEx(regkey, 'Path')
+except WindowsError:
+    pass
+try:
+    options.port,_ = _winreg.QueryValueEx(regkey, 'Port')
+    options.port = int(options.port)
+except WindowsError:
+    pass
+try:
+    options.listen,_ = _winreg.QueryValueEx(regkey, 'Listen')
+except WindowsError:
+    pass
+    
+XRCCTRL(panel, 'path').SetValue(options.path)
+XRCCTRL(panel, 'port').SetValue(str(options.port))
+XRCCTRL(panel, 'listen').SetValue(options.listen)
+
+server = PippServer(options)
+server.start()
+
 icon = PippTaskBarIcon()
 app.MainLoop()
