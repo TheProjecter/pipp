@@ -9,7 +9,7 @@
 
 <p>This is syntax highlighted source code:</p>
 
-<pipp-code src="test.py"/>
+<pipp-code src="test.py" docss="1"/>
 
 </body>
 </pipp>
