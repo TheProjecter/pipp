@@ -208,21 +208,29 @@ def pipp_relative_path(context, link):
 # Render source code as syntax highlighted HTML. This works by calling the
 # perl script "code2html".
 #--
-def pipp_code(context, src, lexer, docss):
+def pipp_code(context, src, code, lexer, docss):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+        
     src = Conversions.StringValue(src)
-    fname = os.path.basename(src)
-    abs_src = ctx.abs_in_path(src)
-    ctx.add_depends(abs_src[len(ctx.in_root):])
+    if src:
+        abs_src = ctx.abs_in_path(src)
+        ctx.add_depends(abs_src[len(ctx.in_root):])
+        fname = os.path.basename(src)
+        code = open(abs_src).read()
+    else:
+        fname = 'inline-code'
+        code = Conversions.StringValue(code)
 
     lexer = Conversions.StringValue(lexer)
     if lexer:
         lexer = get_lexer_by_name(lexer)
-    else:
+    elif src:
         lexer = get_lexer_for_filename(fname)
+    else:
+        raise Exception('The lexer must be explicitly specified for inline code blocks')
     
     formatter = HtmlFormatter(cssclass="source")
-    result = highlight(open(abs_src).read(), lexer, formatter)
+    result = highlight(code, lexer, formatter)
     if Conversions.StringValue(docss) == '1':
         result = '<link rel="stylesheet" href="%s.css"/>' % fname + result
         css = open(ctx.abs_out_path(ctx.abs_in_path(fname + '.css')), 'w')
