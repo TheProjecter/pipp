@@ -121,7 +121,7 @@ def options_cancel(event):
 
 app = wx.PySimpleApp()
 res = wx.xrc.EmptyXmlResource()
-res.Load('pipp.xrc')
+res.Load(os.path.join(os.path.dirname(prog_dir), 'pipp.xrc'))
 
 panel = res.LoadDialog(None, 'options')
 wx.EVT_BUTTON(panel, 1, browse_folders)
