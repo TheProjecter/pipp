@@ -43,8 +43,9 @@ def pipp_file(context, file_name):
     file_names = glob.glob(ctx.abs_in_path(file_name))
     if len(file_names) == 0:
         raise Exception('No files found: ' + file_name)
+    if len(file_names) == 1:
+        ctx.add_depends(file_names[0][len(ctx.in_root):])
     for in_name in file_names:
-        ctx.add_depends(in_name[len(ctx.in_root):])
         out_name = ctx.abs_out_path(in_name)
         if not files.has_key(in_name):
             if os.path.isfile(in_name):
