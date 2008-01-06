@@ -142,7 +142,7 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
                         if not checked.has_key(fname):
                             abs_in = project.abs_in_path(fname)
                             abs_out = re.sub('.pip$', '.html', project.abs_out_path(abs_in))
-                            if os.stat(abs_in).st_mtime > os.stat(abs_out).st_mtime:
+                            if os.path.exists(abs_in) and os.stat(abs_in).st_mtime > os.stat(abs_out).st_mtime:
                                 PippFile(project, project.get_state_node(fname)).build(force=True)
                                 any_built = True
                             checked[fname] = 1
