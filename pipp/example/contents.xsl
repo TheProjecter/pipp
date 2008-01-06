@@ -13,6 +13,9 @@
 <xsl:template match="/page">
     <p align="center"><table width="90%" align="center"><tr>
         <xsl:for-each select="children/page">
+            <xsl:value-of select="pipp:export-depend(@src, 'link')"/>
+            <xsl:value-of select="pipp:export-depend(@src, 'title')"/>            
+            <xsl:value-of select="pipp:export-depend(@src, 'children')"/>
             <td width="50%" style="padding-bottom:0.5em; vertical-align:top;">
                 <xsl:variable name="logo" select="pipp:relative-path(concat('/logos/', (ancestor-or-self::node()/exports/logo)[last()]))"/>
                 <xsl:value-of select="pipp:file($logo)"/>
@@ -21,6 +24,8 @@
                     <xsl:value-of select="exports/title"/>
                 </a></strong><br/>
                 <xsl:for-each select="children/page">
+                    <xsl:value-of select="pipp:export-depend(@src, 'link')"/>
+                    <xsl:value-of select="pipp:export-depend(@src, 'title')"/>            
                     <a href="{pipp:relative-path(exports/link)}"><xsl:value-of select="exports/title"/></a>
                     <xsl:if test="position() != last()">, </xsl:if>
                 </xsl:for-each>

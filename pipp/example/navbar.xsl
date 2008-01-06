@@ -8,12 +8,20 @@
 
 <xsl:variable name="current_page" select="pipp:import('link')"/>
 
+<xsl:template match="@*|*">
+    <xsl:copy>
+        <xsl:apply-templates select="*|@*|text()"/>
+    </xsl:copy>
+</xsl:template>
+
 <!--
  ! This template starts by matching the first page element and is then called
  ! recursively.
  !-->
-<xsl:template match="/page" name="render_navbar">
+<xsl:template match="/xxxpage" name="render_navbar">
     <xsl:param name="level" select="1"/>
+    <xsl:value-of select="pipp:export-depend(@src, 'link')"/>
+    <xsl:value-of select="pipp:export-depend(@src, 'title')"/>
 
     <!--
      ! Display the "bullet" image. Ideally this would be replaced by CSS, but
@@ -47,6 +55,7 @@
      ! tempalate for all children of the current page.
      !-->
     <xsl:if test="descendant-or-self::page[exports/link = $current_page]">
+        <xsl:value-of select="pipp:export-depend(@src, 'children')"/>
         <xsl:for-each select="children/page">
             <xsl:call-template name="render_navbar">
                 <xsl:with-param name="level"><xsl:value-of select="$level + 1"/></xsl:with-param>
