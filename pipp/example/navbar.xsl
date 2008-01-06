@@ -8,17 +8,11 @@
 
 <xsl:variable name="current_page" select="pipp:import('link')"/>
 
-<xsl:template match="@*|*">
-    <xsl:copy>
-        <xsl:apply-templates select="*|@*|text()"/>
-    </xsl:copy>
-</xsl:template>
-
 <!--
  ! This template starts by matching the first page element and is then called
  ! recursively.
  !-->
-<xsl:template match="/xxxpage" name="render_navbar">
+<xsl:template match="/page" name="render_navbar">
     <xsl:param name="level" select="1"/>
     <xsl:value-of select="pipp:export-depend(@src, 'link')"/>
     <xsl:value-of select="pipp:export-depend(@src, 'title')"/>
