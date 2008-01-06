@@ -110,6 +110,8 @@ class PippServer(threading.Thread):
         self.project = pipp.PippProject(self.options.path, self.options)
         if self.project.new_project:
             self.project.build_full()
+            # TBD: avoid two builds at start
+            self.project.build_full()
         self.project.serve((self.options.listen, self.options.port))
     
 

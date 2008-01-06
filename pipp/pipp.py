@@ -31,7 +31,8 @@ class PippProject(object):
         self.changed_exports = []
         self.new_project = not os.path.exists(self.state_xml)
         if self.new_project:
-            open(self.state_xml, 'w').write('<page/>')
+            open(self.state_xml, 'w').write('<page src="%s"><exports><link>%s</link></exports></page>' 
+                    % (self.index, re.sub('.pip$', '.html', self.index)))
         self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))        
         self._processor = None
 
@@ -346,6 +347,8 @@ if __name__ == '__main__':
             prj.build_full()
         elif prj.new_project:
             print "Project's first use - initiating full build"
+            prj.build_full()
+            # TBD: this is a tactical measure until dependencies are handled better
             prj.build_full()
         if options.serve:
             prj.serve(listen=(options.listen, options.port))
