@@ -16,7 +16,7 @@ import pipp_xslt
 
 
 class PippProject(object):
-    
+
     def __init__(self, in_root, options):
 
         #--
@@ -31,9 +31,9 @@ class PippProject(object):
         self.changed_exports = []
         self.new_project = not os.path.exists(self.state_xml)
         if self.new_project:
-            open(self.state_xml, 'w').write('<page src="%s"><exports><link>%s</link></exports></page>' 
+            open(self.state_xml, 'w').write('<page src="%s"><exports><link>%s</link></exports></page>'
                     % (self.index, re.sub('.pip$', '.html', self.index)))
-        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))        
+        self.state_doc = NonvalidatingReader.parseUri(OsPathToUri(self.state_xml))
         self._processor = None
 
     #--
@@ -55,7 +55,7 @@ class PippProject(object):
         state_file = open(self.state_xml, 'w')
         PrettyPrint(self.state_doc.documentElement, state_file)
         state_file.close()
-            
+
         if self.changed_exports:
             rebuild_pages = set()
             for ch in self.changed_exports:
@@ -95,7 +95,7 @@ class PippProject(object):
     # Partial rebuild of a project. Check pages in state XML for modified files.
     #--
     def build(self):
-        for state_node in self.state_doc.xpath('//page'):                
+        for state_node in self.state_doc.xpath('//page'):
             PippFile(self, state_node).build()
         self.write_state()
 
@@ -142,11 +142,13 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
                         if not checked.has_key(fname):
                             abs_in = project.abs_in_path(fname)
                             abs_out = re.sub('.pip$', '.html', project.abs_out_path(abs_in))
-                            if os.path.exists(abs_in) and os.stat(abs_in).st_mtime > os.stat(abs_out).st_mtime:
+                            if (os.path.exists(abs_in) and
+                                (not os.path.exists(abs_out) or
+                                    os.stat(abs_in).st_mtime > os.stat(abs_out).st_mtime)):
                                 PippFile(project, project.get_state_node(fname)).build(force=True)
                                 any_built = True
                             checked[fname] = 1
-                    any_built = any_built or PippFile(project, node).build(force=False)                    
+                    any_built = any_built or PippFile(project, node).build(force=False)
                     if any_built:
                         project.write_state()
                         # Avoid any state being stored between requests
@@ -161,7 +163,7 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(traceback.format_exc())
 
-            
+
 class PippFile(object):
 
     def __init__(self, project, old_state_node):
@@ -169,7 +171,7 @@ class PippFile(object):
         self.old_state_node = old_state_node
         self.file_name = old_state_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
         self.out_file = re.sub('\.pip$', '.html', self.file_name)
-        
+
     @property
     def in_root(self):
         return self.project.in_root
@@ -250,7 +252,7 @@ class PippFile(object):
         # Prepare the new state node
         #--
         self.state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
-        self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)        
+        self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)
         for node_name in ['exports', 'depends', 'edepends', 'children']:
             new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
             self.state_node.appendChild(new_node)
@@ -283,13 +285,13 @@ class PippFile(object):
         # Determine if any exported state was changed
         #--
         old_exports = dict((x.tagName, get_text(x)) for x in self.old_state_node.xpath('exports/*'))
-        new_exports = dict((x.tagName, get_text(x)) for x in self.state_node.xpath('exports/*'))                    
+        new_exports = dict((x.tagName, get_text(x)) for x in self.state_node.xpath('exports/*'))
         changed = []
         for e in new_exports:
             if new_exports[e] != old_exports.pop(e, None):
                 changed.append(e)
-        changed += old_exports.keys()        
-        self.project.changed_exports += ['%s:%s' % (self.file_name, c) for c in changed]        
+        changed += old_exports.keys()
+        self.project.changed_exports += ['%s:%s' % (self.file_name, c) for c in changed]
 
         #--
         # Determine if the list of children changed
@@ -301,7 +303,7 @@ class PippFile(object):
 
         #--
         # Build children as appropriate
-        #--        
+        #--
         children_map = dict((x.getAttributeNS(EMPTY_NAMESPACE, 'src'), x) for x in self.old_state_node.xpath('children/page'))
         for skel_node in list(self.state_node.xpath('children/page')):
             file_name = skel_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
@@ -314,7 +316,7 @@ class PippFile(object):
                 skel_node.parentNode.removeChild(skel_node)
             if (isnew or force_children) and file_name.endswith('.pip'):
                 PippFile(self.project, full_node).build(force or isnew, force_children)
-            
+
         return True
 
 
