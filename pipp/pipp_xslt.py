@@ -25,7 +25,7 @@ files = {}
 # the state DOM; the main pipp process will notice this and build the file.
 #--
 def pipp_child(context, file_name):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     file_name = ctx.abs_in_path(Conversions.StringValue(file_name)) \
                                 [len(ctx.in_root):]
     new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
@@ -38,7 +38,7 @@ def pipp_child(context, file_name):
 # module to support wildcards in file names.
 #--
 def pipp_file(context, file_name):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     file_name = Conversions.StringValue(file_name)
     file_names = glob.glob(ctx.abs_in_path(file_name))
     if len(file_names) == 0:
@@ -59,7 +59,7 @@ def pipp_file(context, file_name):
 # This function does not support wildcards in file names.
 #--
 def pipp_child_file(context, src, title):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
 
     #--
     # Copy the file, using a cache for efficiency
@@ -97,7 +97,7 @@ def pipp_child_file(context, src, title):
 # Export a variable from the current page, storing it in the state DOM.
 #--
 def pipp_export(context, name, value):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, Conversions.StringValue(name))
     new_node.appendChild(ctx.state_doc.createTextNode(Conversions.StringValue(value)))
     ctx.exports_node.appendChild(new_node)
@@ -107,7 +107,7 @@ def pipp_export(context, name, value):
 # function searches up the page tree until it finds a definition.
 #--
 def pipp_import(context, name):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     name = Conversions.StringValue(name)
     cur_doc = ctx.state_node
     while cur_doc:
@@ -124,7 +124,7 @@ def pipp_import(context, name):
 # separator.
 #--
 def pipp_import_join(context, name, join_str):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     name = Conversions.StringValue(name)
     cur_doc = ctx.state_node
     values = []
@@ -140,7 +140,7 @@ def pipp_import_join(context, name, join_str):
 # Add a dependency on an exported variable
 #--
 def pipp_export_depend(context, src, export):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     ctx.add_edepends(Conversions.StringValue(src), Conversions.StringValue(export))
 
 #--
@@ -148,32 +148,34 @@ def pipp_export_depend(context, src, export):
 # state file.
 #--
 def pipp_map_view(context, xslt_file):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
 
     #--
     # Create the XSLT processor object. For efficiency there is a cache of these.
     #--
     xslt_file = ctx.abs_in_path(Conversions.StringValue(xslt_file))
     ctx.add_depends(xslt_file[len(ctx.in_root):])
-    if not processors.has_key(xslt_file):
-        processors[xslt_file]= Processor.Processor()
-        processors[xslt_file].registerExtensionModules(['pipp_xslt'])
-        processors[xslt_file].appendStylesheet(InputSource.DefaultFactory.fromString(open(xslt_file).read(), xslt_file))
-    processors[xslt_file].extensionParams[(NAMESPACE, 'context')] = ctx
+    processor = processors.get(xslt_file)
+    if not processor:
+        processor = Processor.Processor()
+        processor.registerExtensionModules(['pipp_xslt'])
+        processor.appendStylesheet(InputSource.DefaultFactory.fromString(open(xslt_file).read(), xslt_file))
+    processor.extensionParams[(NAMESPACE, 'context')] = ctx
 
     #--
     # Run the processor against state.xml and return the output.
+    # If successful, store the processor object in a cache
     #--
     input = InputSource.DefaultFactory.fromUri(OsPathToUri(ctx.state_xml))
-    return processors[xslt_file].run(input)    
-    # TBD: running off in-memory DOM would be preferable, but causes problems
-    #return processors[xslt_file].runNode(ctx.state_doc)
+    output = processor.run(input)
+    processors[xslt_file] = processor
+    return output
 
 #--
 # Get the current file name.
 #--
 def pipp_file_name(context):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     return ctx.out_file
 
 #--
@@ -181,7 +183,7 @@ def pipp_file_name(context):
 # date format string.
 #--
 def pipp_file_time(context, fmt):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     fmt = Conversions.StringValue(fmt)
     fname = ctx.in_root + ctx.file_name
     return time.strftime(fmt, time.localtime(os.stat(fname).st_mtime))
@@ -193,7 +195,7 @@ def pipp_file_time(context, fmt):
 # same letter.
 #--
 def pipp_relative_path(context, link):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     link = Conversions.StringValue(link)
     if len(link) == 0: return ''
     if link[0] != '/': return link
@@ -210,8 +212,8 @@ def pipp_relative_path(context, link):
 # perl script "code2html".
 #--
 def pipp_code(context, src, code, lexer, docss):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
-        
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
+
     src = Conversions.StringValue(src)
     if src:
         abs_src = ctx.abs_in_path(src)
@@ -229,7 +231,7 @@ def pipp_code(context, src, code, lexer, docss):
         lexer = get_lexer_for_filename(fname)
     else:
         raise Exception('The lexer must be explicitly specified for inline code blocks')
-    
+
     formatter = HtmlFormatter(cssclass="source")
     result = highlight(code, lexer, formatter)
     if Conversions.StringValue(docss) == '1':
@@ -245,14 +247,14 @@ def pipp_code(context, src, code, lexer, docss):
 # For efficiency they keep a cache of open image objects.
 #--
 def pipp_image_width(context, src):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     image_name = ctx.abs_in_path(Conversions.StringValue(src))
     if not images.has_key(image_name):
         images[image_name] = Image.open(image_name)
     return images[image_name].size[0]
 
 def pipp_image_height(context, src):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     image_name = ctx.abs_in_path(Conversions.StringValue(src))
     if not images.has_key(image_name):
         images[image_name] = Image.open(image_name)
@@ -262,11 +264,11 @@ def pipp_image_height(context, src):
 # Create a thumbnail of an image, at the specified size.
 #--
 def pipp_thumbnail(context, src, width, height):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
     image_name = ctx.abs_in_path(Conversions.StringValue(src))
     ctx.add_depends(image_name[len(ctx.in_root):])
     thumb_name = re.sub('(\.\w+)$', '_thumb\g<1>', Conversions.StringValue(src))
-    
+
     if width:
         width = int(Conversions.NumberValue(width))
     if height:
@@ -276,10 +278,10 @@ def pipp_thumbnail(context, src, width, height):
     w,h = img.size
 
     if height and not width:
-        width = int(w * height / h)    
+        width = int(w * height / h)
     if width and not height:
-        height = int(h * width / w)    
-    
+        height = int(h * width / w)
+
     img = img.resize((width, height))
     img.save(ctx.abs_out_path(ctx.abs_in_path(thumb_name)))
 
@@ -297,7 +299,7 @@ def pipp_thumbnail(context, src, width, height):
 # The background colour must be specified for anti-aliasing to work properly.
 #--
 def pipp_gtitle(context, font, height, texture, bgcolor, text):
-    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]    
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
 
     #--
     # Technical dependencies; not really important. Not activating for the time being.
@@ -342,7 +344,7 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
     #--
     out = Image.new('RGBA', text_mask.size, bgcolor)
     out.paste(background, (0, 0), text_mask)
-    out = out.convert('P')    
+    out = out.convert('P')
     out.save(ctx.abs_out_path(pseudo_in_name), transparency=0)
 
     #--
