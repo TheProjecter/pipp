@@ -301,11 +301,8 @@ def pipp_thumbnail(context, src, width, height):
 def pipp_gtitle(context, font, height, texture, bgcolor, text):
     ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
 
-    #--
-    # Technical dependencies; not really important. Not activating for the time being.
-    #--
-    #ctx.add_depends(Conversions.StringValue(font))
-    #ctx.add_depends(Conversions.StringValue(texture))
+    ctx.add_depends(Conversions.StringValue(font))
+    ctx.add_depends(Conversions.StringValue(texture))
 
     #--
     # Convert the XSLT parameters into regular python types
