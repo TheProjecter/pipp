@@ -351,6 +351,15 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
 
     return file_name
 
+
+def pipp_link(context, link):
+    """Record a link"""
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
+    new_node = ctx.state_doc.createElementNS(EMPTY_NAMESPACE, Conversions.StringValue('link'))
+    new_node.appendChild(ctx.state_doc.createTextNode(Conversions.StringValue(link)))
+    ctx.links_node.appendChild(new_node)
+    # TBD: avoid dupes
+
 #--
 # Register all the extension functions with the XSLT processor.
 #--
@@ -365,6 +374,7 @@ ExtFunctions = \
     (NAMESPACE, 'import-join'):     pipp_import_join,
     (NAMESPACE, 'export-depend'):   pipp_export_depend,
     (NAMESPACE, 'map-view'):        pipp_map_view,
+    (NAMESPACE, 'link'):            pipp_link,
 
     (NAMESPACE, 'file-name'):       pipp_file_name,
     (NAMESPACE, 'file-time'):       pipp_file_time,

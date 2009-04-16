@@ -113,6 +113,37 @@ class PippProject(object):
         nodes = self.state_doc.xpath("//page[@src='%s']" % path.replace("'", ""))
         return nodes and nodes[0] or None
 
+
+    def check_links(self):
+        elink = set()
+        for node in self.state_doc.xpath("//page"):
+            src = get_text(node.xpath("exports/link")[0])
+            for link in node.xpath("links/link"):
+                link = get_text(link)
+                anchor = None
+                if '#' in link:
+                    link, anchor = link.split('#')
+                    if not link:
+                        continue # TBD: check anchor
+                if "\\" in link:
+                    print "In %s, link contains backslash: %s" % (src, link)
+                    continue
+                if link.startswith("/"):
+                    print "In %s, link starts with a slash: %s" % (src, link)
+                    continue
+                if any(link.startswith(x) for x in ('http:', 'https:', 'ftp:', 'mailto:')):
+                    elink.add(link)
+                else:
+                    target = os.path.join(self.out_root, src[1:])
+                    target = os.path.join(os.path.dirname(target), link)
+                    try:
+                        content = open(target).read()
+                    except IOError, e:
+                        print "In %s, link target missing: %s" % (src, link)
+                    #if anchor and (u'name="%s"' % anchor) not in content:
+                    #    print "In %s, link anchor missing: %s" % (src, link)
+        return elink
+
 #--
 # Run as a webserver that outputs the selected project, rebuilding output
 # files on demand.
@@ -253,7 +284,7 @@ class PippFile(object):
         #--
         self.state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
         self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)
-        for node_name in ['exports', 'depends', 'edepends', 'children']:
+        for node_name in ['exports', 'links', 'produces', 'depends', 'edepends', 'children']:
             new_node = self.project.state_doc.createElementNS(EMPTY_NAMESPACE, node_name)
             self.state_node.appendChild(new_node)
             setattr(self, node_name + '_node', new_node)
@@ -327,6 +358,10 @@ if __name__ == '__main__':
     parser = OptionParser(usage="usage: %prog [options] project_root")
     parser.add_option("-s", "--serve", dest="serve", action='store_true',
             help='Start a web server that serves the project; this is useful for development')
+    parser.add_option("-c", "--check-links", dest="check_links", action='store_true',
+            help='Check links in the site')
+    parser.add_option("-e", "--ext-links", dest="ext_links", action='store_true',
+            help='Display external links')
     parser.add_option("-p", "--port", dest="port", type='int', default=8080,
             help='Specify port for the web server (default %default)')
     parser.add_option("-l", "--listen", dest="listen", default='127.0.0.1',
@@ -350,9 +385,12 @@ if __name__ == '__main__':
         elif prj.new_project:
             print "Project's first use - initiating full build"
             prj.build_full()
-            # TBD: this is a tactical measure until dependencies are handled better
-            prj.build_full()
         if options.serve:
             prj.serve(listen=(options.listen, options.port))
         if not options.full and not options.serve:
             prj.build()
+        if options.check_links or options.ext_links:
+            elinks = prj.check_links()
+            if options.ext_links:
+                for e in elinks:
+                    print e
