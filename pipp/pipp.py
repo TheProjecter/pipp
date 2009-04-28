@@ -9,11 +9,13 @@ from Ft.Xml.Domlette import NonvalidatingReader
 from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Lib.Uri import OsPathToUri
 from Ft.Xml.XPath import Compile, Conversions
-import re, os, sys, BaseHTTPServer, SimpleHTTPServer, traceback
+import re, os, sys, BaseHTTPServer, SimpleHTTPServer, traceback, threading
+import urllib2 as ul
 from optparse import OptionParser
 from pipp_utils import *
 import pipp_xslt
 
+threads = 10 # for checking external links
 
 class PippProject(object):
 
@@ -115,7 +117,7 @@ class PippProject(object):
 
 
     def check_links(self):
-        elink = set()
+        elink = {}
         for node in self.state_doc.xpath("//page"):
             src = get_text(node.xpath("exports/link")[0])
             for link in node.xpath("links/link"):
@@ -132,7 +134,7 @@ class PippProject(object):
                     print "In %s, link starts with a slash: %s" % (src, link)
                     continue
                 if any(link.startswith(x) for x in ('http:', 'https:', 'ftp:', 'mailto:')):
-                    elink.add(link)
+                    elink.setdefault(link, []).append(src)
                 else:
                     target = os.path.join(self.out_root, src[1:])
                     target = os.path.join(os.path.dirname(target), link)
@@ -140,9 +142,43 @@ class PippProject(object):
                         content = open(target).read()
                     except IOError, e:
                         print "In %s, link target missing: %s" % (src, link)
-                    #if anchor and (u'name="%s"' % anchor) not in content:
-                    #    print "In %s, link anchor missing: %s" % (src, link)
+                    if anchor and (u'name="%s"' % anchor) not in content:
+                        print "In %s, link anchor missing: %s" % (src, link)
         return elink
+
+    def check_elinks(self, elinks):
+        thrd = []
+        for i in range(threads):
+            t = LinkChecker()
+            t.elinks = elinks
+            thrd.append(t)
+            t.start()
+        for t in thrd:
+            t.join()
+
+
+errors = []
+
+class LinkChecker(threading.Thread):
+    def run(self):
+        while True:
+            try:
+                l,s = self.elinks.popitem()
+            except KeyError:
+                return
+            if l.startswith('mailto:'):
+                continue
+            try:
+                conn = ul.urlopen(l)
+                content = conn.read()
+            except ul.URLError, e:
+                print "Bad link: %s (%s)" % (l, str(e)) # (l, e.reason.args[1])
+                print s
+                continue
+            if conn.geturl() != l:
+                print "Redirect: %s %s" % (conn.geturl(), l)
+                print s
+
 
 #--
 # Run as a webserver that outputs the selected project, rebuilding output
@@ -392,5 +428,6 @@ if __name__ == '__main__':
         if options.check_links or options.ext_links:
             elinks = prj.check_links()
             if options.ext_links:
-                for e in elinks:
-                    print e
+                prj.check_elinks(elinks)
+                #for e in elinks:
+                #    print e

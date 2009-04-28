@@ -14,7 +14,7 @@ class PippTaskBarIcon(wx.TaskBarIcon):
     def __init__(self, *args, **kwargs):
         super(PippTaskBarIcon, self).__init__(*args, **kwargs)
         self.SetIcon(wx.Icon('pipp.ico', wx.BITMAP_TYPE_ICO), 'Pipp')
-        
+
     def CreatePopupMenu(self):
         menu = res.LoadMenu('popup_menu')
         global options
@@ -27,12 +27,12 @@ class PippTaskBarIcon(wx.TaskBarIcon):
         wx.EVT_MENU(menu, 3, self.rebuild)
         wx.EVT_MENU(menu, 4, self.exit)
         wx.EVT_MENU(menu, 5, self.explore)
+        wx.EVT_MENU(menu, 6, self.links)
         return menu
 
     def options(self, event):
-        global panel
         panel.Show()
-                
+
     def browser(self, event):
         webbrowser.open('http://%s:%d/index.html' % (options.listen, options.port))
 
@@ -46,6 +46,16 @@ class PippTaskBarIcon(wx.TaskBarIcon):
     def explore(self, event):
         os.system('explorer ' + options.path)
 
+    def links(self, event):
+        server.project.build()
+        elinks = server.project.check_links()
+        tmp = os.path.join(os.environ['TMP'], 'pipplinks.html')
+        f = open(tmp, 'w')
+        for l in elinks:
+            if not l.startswith('mailto:'):
+                f.write('<a href="%s">%s</a><br/>' % (l, l))
+        f.close()
+        webbrowser.open(tmp)
 
 def browse_folders(event):
     tb = XRCCTRL(panel, 'path')
@@ -57,47 +67,47 @@ def browse_folders(event):
 
 
 def options_ok(event):
-    
+
     # Validate
     msgs = []
 
-    port = XRCCTRL(panel, 'port').GetValue().strip()    
+    port = XRCCTRL(panel, 'port').GetValue().strip()
     if re.match('^\d+$', port):
         port = int(port)
         if not 1 <= port <= 65535:
             msgs.append('The port must be a number 0-65535')
-    else:        
+    else:
         msgs.append('The port must be a number 0-65535')
-    
+
     listen = XRCCTRL(panel, 'listen').GetValue().strip()
     if not re.match('^\d+\.\d+\.\d+\.\d+$', listen):
         msgs.append('The server address must be a valid ip address of an interface on this system')
-    
+
     path = XRCCTRL(panel, 'path').GetValue().strip()
     if not all(os.path.exists(os.path.join(path, t)) for t in ('pipp.xsl', 'index.pip')):
         msgs.append('The path must point to a valid Pipp project (both pipp.xsl and index.pip must exist)')
-    
+
     # Display any problems to the user
     if msgs:
         msg = wx.MessageDialog(panel, '\n'.join(msgs),
                              'Pipp', style = wx.OK | wx.ICON_EXCLAMATION)
         msg.ShowModal()
         return
-        
-    # Activate    
+
+    # Activate
     global options
     options.port = port
     options.listen = listen
-    options.path = path    
+    options.path = path
 
     _winreg.SetValueEx(regkey, 'Port', 0, _winreg.REG_SZ, str(port))
     _winreg.SetValueEx(regkey, 'Listen', 0, _winreg.REG_SZ, listen)
     _winreg.SetValueEx(regkey, 'Path', 0, _winreg.REG_SZ, path)
-    
+
     global server
     server = PippServer(options)
     server.start()
-        
+
     panel.Close()
 
 
@@ -105,15 +115,13 @@ class PippServer(threading.Thread):
     def __init__(self, options):
         super(PippServer, self).__init__()
         self.options = options
-        
-    def run(self):        
+
+    def run(self):
         self.project = pipp.PippProject(self.options.path, self.options)
         if self.project.new_project:
             self.project.build_full()
-            # TBD: avoid two builds at start
-            self.project.build_full()
         self.project.serve((self.options.listen, self.options.port))
-    
+
 
 def options_cancel(event):
     panel.Close()
@@ -131,7 +139,7 @@ wx.EVT_BUTTON(panel, 3, options_cancel)
 try:
     regkey = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, 'Software\\Pajhome\\Pipp', 0, _winreg.KEY_ALL_ACCESS)
 except WindowsError:
-    regkey = _winreg.CreateKey(_winreg.HKEY_CURRENT_USER, 'Software\\Pajhome\\Pipp')        
+    regkey = _winreg.CreateKey(_winreg.HKEY_CURRENT_USER, 'Software\\Pajhome\\Pipp')
 try:
     options.path,_ = _winreg.QueryValueEx(regkey, 'Path')
 except WindowsError:
@@ -145,7 +153,7 @@ try:
     options.listen,_ = _winreg.QueryValueEx(regkey, 'Listen')
 except WindowsError:
     pass
-    
+
 XRCCTRL(panel, 'path').SetValue(options.path)
 XRCCTRL(panel, 'port').SetValue(str(options.port))
 XRCCTRL(panel, 'listen').SetValue(options.listen)

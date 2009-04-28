@@ -12,6 +12,7 @@ import Image, ImageDraw, ImageFont
 from pygments import highlight
 from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
 from pygments.formatters import HtmlFormatter
+from jpeg import jpeg
 
 #--
 # Caches
@@ -315,8 +316,8 @@ def pipp_gtitle(context, font, height, texture, bgcolor, text):
     file_name = re.sub('[^a-zA-Z0-9]', '_', text) + '.png'
     pseudo_in_name = ctx.abs_in_path(file_name)
 
-    # Avoid unwanted cropping on the left
-    text = '    ' + text
+    # Avoid unwanted cropping
+    text = '  ' + text + '  '
 
     #--
     # Create the text mask
@@ -360,6 +361,13 @@ def pipp_link(context, link):
     ctx.links_node.appendChild(new_node)
     # TBD: avoid dupes
 
+def pipp_jpeg_comment(context, src):
+    ctx = context.processor.extensionParams[(NAMESPACE, 'context')]
+    src = ctx.abs_in_path(Conversions.StringValue(src))
+    ctx.add_depends(src[len(ctx.in_root):])
+    return jpeg.getComments(src)
+
+
 #--
 # Register all the extension functions with the XSLT processor.
 #--
@@ -383,6 +391,7 @@ ExtFunctions = \
 
     (NAMESPACE, 'image-width'):     pipp_image_width,
     (NAMESPACE, 'image-height'):    pipp_image_height,
+    (NAMESPACE, 'jpeg-comment'):    pipp_jpeg_comment,
     (NAMESPACE, 'thumbnail'):       pipp_thumbnail,
     (NAMESPACE, 'gtitle'):          pipp_gtitle,
 }

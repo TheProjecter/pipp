@@ -95,6 +95,9 @@
     <object class="wxMenuItem" name="5">
       <label>Explore Source</label>
     </object>
+    <object class="wxMenuItem" name="6">
+      <label>Check Links</label>
+    </object>
     <object class="wxMenuItem" name="3">
       <label>Full Rebuild</label>
     </object>
