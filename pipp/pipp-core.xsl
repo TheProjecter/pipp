@@ -60,7 +60,7 @@
 <xsl:template match="pipp-img" name="pipp-img">
     <xsl:value-of select="pipp:file(@src)"/>
     <xsl:variable name="comment" select="pipp:jpeg-comment(@src)"/>
-    <xsl:if test="$comment">
+    <xsl:if test="starts-with($comment, 'http')">
         <a href="{$comment}"><img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
             <xsl:apply-templates select="@*"/>
         </img></a>
