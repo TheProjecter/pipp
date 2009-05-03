@@ -1,0 +1,31 @@
+2.0.3
+    Checking links
+    JPEG Comments
+    Web server is more robust against XSLT errors
+
+2.0.2
+    HTTP server reports errors to the browser
+    More functional command line; now uses optparse
+    Code in pipp.py refactored; access state XML more cleanly
+    Syntax highlighting now done by Pygments; inline blocks now supported
+    Dependencies on exported variables tracked; partial rebuilds supported
+    Dependencies on .xsl files tracked
+    Windows installer package
+    Windows tool tray application
+
+2.0.1
+    Identify project purely by in_root; makes getting started easier
+    File dependency tracking
+    Built-in web server
+    Code refactored to just store a context object in the processor
+    Example site; quick start documentation
+    Improved error reporting
+
+2.0.0
+    Python version using 4Suite
+
+1.1.0
+    Non-released version that supports site maps and graphical titles
+
+1.0.0
+    Initial version, written in Perl, based on the C pre-processor

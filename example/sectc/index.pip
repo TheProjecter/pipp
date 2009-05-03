@@ -1,0 +1,12 @@
+<pipp>
+<title>Section C</title>
+<style>rave</style>
+<logo>rave.gif</logo>
+<body>
+
+<pipp-child src="page1.pip"/>
+
+<p>Text goes here</p>
+
+</body>
+</pipp>
