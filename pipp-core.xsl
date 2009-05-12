@@ -60,16 +60,18 @@
 <xsl:template match="pipp-img" name="pipp-img">
     <xsl:value-of select="pipp:file(@src)"/>
     <xsl:variable name="comment" select="pipp:jpeg-comment(@src)"/>
-    <xsl:if test="starts-with($comment, 'http')">
-        <a href="{$comment}"><img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
-            <xsl:apply-templates select="@*"/>
-        </img></a>
-    </xsl:if>
-    <xsl:if test="not($comment)">
-        <img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
-            <xsl:apply-templates select="@*"/>
-        </img>
-    </xsl:if>
+    <xsl:choose>
+        <xsl:when test="not(@nolink) and starts-with($comment, 'http')">
+            <a href="{$comment}"><img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
+                <xsl:apply-templates select="@*"/>
+            </img></a>
+        </xsl:when>
+        <xsl:otherwise>
+            <img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
+                <xsl:apply-templates select="@*"/>
+            </img>
+        </xsl:otherwise>
+    </xsl:choose>
 </xsl:template>
 
 <!--
