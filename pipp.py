@@ -345,7 +345,7 @@ class PippFile(object):
         #--
         abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
         output_fh = open(abs_output_file, 'w')
-        output_fh.write(output)
+        output_fh.write('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">\n' + output)
         output_fh.close()
 
         #--
