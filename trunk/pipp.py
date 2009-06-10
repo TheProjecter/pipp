@@ -17,6 +17,13 @@ import pipp_xslt
 
 threads = 10 # for checking external links
 
+class SpellingMistake(Exception):
+    def __init__(self, msg, filename, words):
+        super(SpellingMistake, self).__init__(msg)
+        self.filename = filename
+        self.words = words
+
+
 class PippProject(object):
 
     def __init__(self, in_root, options):
@@ -194,11 +201,26 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
         format += ', path ' + self.path
         self.log_message(format, *args)
 
+    def do_POST(self):
+        if self.path == '/__addwords':
+            clen = int(self.headers.get('Content-Length', 0))
+            data = clen and self.rfile.read(clen)
+            words = [elem[8:] for elem in data.split('&') if elem.startswith('addword=')]
+            wl = open(self.server.pipp_project.in_root + '/en.pws', 'a')
+            wl.write('\n'.join(words) + '\n')
+            wl.close()
+            if self.headers.get('Referer'):
+                self.send_response(301)
+                self.send_header("Location", self.headers['Referer'])
+                self.end_headers()
+        else:
+            self.send_error(404, "File not found")
+
     def do_GET(self):
         project = self.server.pipp_project
         try:
             if self.path.endswith('/'):
-                self.path += '.html'
+                self.path += 'index.html'
             if self.path.endswith('.html'):
                 node = project.get_state_node(re.sub('.html$', '.pip', self.path))
                 if node:
@@ -224,6 +246,15 @@ class PippHTTPRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
                         pipp_xslt.files = {}
                         project._processor = None
             SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        except SpellingMistake, e:
+            self.send_response(500)
+            self.send_header("Content-type", 'text/html')
+            self.end_headers()
+            self.wfile.write("File '%s' contains misspelled words:<form action=\"/__addwords\" method=\"post\">" % e.filename)
+            for word in set(e.words):
+                if word:
+                    self.wfile.write('<input type="checkbox" name="addword" value="%s"/>%s<br/>' % (word, word))
+            self.wfile.write('<input type="submit"/></form>')
         except:
             self.send_response(500)
             self.send_header("Content-type", 'text/plain')
@@ -300,9 +331,7 @@ class PippFile(object):
     #--
     def build(self, force=False, force_children=False):
 
-        #--
         # Determine if the timestamp on any dependencies is newer than the output
-        #--
         if not force:
             abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
             if os.path.exists(abs_output_file):
@@ -315,9 +344,7 @@ class PippFile(object):
         if self.project.options.verbose:
             print "Building " + self.file_name
 
-        #--
         # Prepare the new state node
-        #--
         self.state_node = self.state_doc.createElementNS(EMPTY_NAMESPACE, 'page')
         self.state_node.setAttributeNS(EMPTY_NAMESPACE, 'src', self.file_name)
         for node_name in ['exports', 'links', 'produces', 'depends', 'edepends', 'children']:
@@ -326,31 +353,39 @@ class PippFile(object):
             setattr(self, node_name + '_node', new_node)
         self.add_depends(self.project.stylesheet_fname)
 
-        #--
         # Run the XSLT processor
-        #--
         self.old_state_node.parentNode.insertBefore(self.state_node, self.old_state_node)
         self.old_state_node.parentNode.removeChild(self.old_state_node)
         try:
             input = InputSource.DefaultFactory.fromUri(OsPathToUri(self.project.in_root + self.file_name))
             self.project.processor.extensionParams[(NAMESPACE, 'context')] = self
             output = self.project.processor.run(input)
+
+            if not self.state_node.xpath('exports/spell'):
+                # Check spelling
+                pin, pout = os.popen4('"c:/program files/aspell/bin/aspell" --master=british --home-dir=%s --mode=sgml --rem-sgml-check=alt list' % self.in_root)
+                try:
+                    pin.write(output)
+                except IOError:
+                    raise Exception('aspell failed: ' + pout.read())
+                pin.close()
+                bad_words = pout.read()
+                pout.close()
+                if bad_words:
+                    raise SpellingMistake("Mispelled words in '%s': %s" % (self.out_file, bad_words), self.out_file, bad_words.split('\n'))
+
         except:
             self.state_node.parentNode.insertBefore(self.old_state_node, self.state_node)
             self.state_node.parentNode.removeChild(self.state_node)
             raise
 
-        #--
         # Determine the output file name and write output to it
-        #--
         abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
         output_fh = open(abs_output_file, 'w')
         output_fh.write('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">\n' + output)
         output_fh.close()
 
-        #--
         # Determine if any exported state was changed
-        #--
         old_exports = dict((x.tagName, get_text(x)) for x in self.old_state_node.xpath('exports/*'))
         new_exports = dict((x.tagName, get_text(x)) for x in self.state_node.xpath('exports/*'))
         changed = []
@@ -360,17 +395,13 @@ class PippFile(object):
         changed += old_exports.keys()
         self.project.changed_exports += ['%s:%s' % (self.file_name, c) for c in changed]
 
-        #--
         # Determine if the list of children changed
-        #--
         old_children = [Conversions.StringValue(x) for x in self.old_state_node.xpath('children/page/@src')]
         new_children = [Conversions.StringValue(x) for x in self.state_node.xpath('children/page/@src')]
         if old_children != new_children:
             self.project.changed_exports.append('%s:children' % self.file_name)
 
-        #--
         # Build children as appropriate
-        #--
         children_map = dict((x.getAttributeNS(EMPTY_NAMESPACE, 'src'), x) for x in self.old_state_node.xpath('children/page'))
         for skel_node in list(self.state_node.xpath('children/page')):
             file_name = skel_node.getAttributeNS(EMPTY_NAMESPACE, 'src')
