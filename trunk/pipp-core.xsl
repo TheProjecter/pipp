@@ -63,12 +63,18 @@
     <xsl:choose>
         <xsl:when test="not(@nolink) and starts-with($comment, 'http')">
             <a href="{$comment}"><img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
-                <xsl:apply-templates select="@*"/>
+                <xsl:if test="not(@alt)">
+                    <xsl:attribute name="alt"/>
+                </xsl:if>
+                <xsl:apply-templates select="@*[name() != 'nolink']"/>
             </img></a>
         </xsl:when>
         <xsl:otherwise>
             <img width="{pipp:image-width(@src)}" height="{pipp:image-height(@src)}">
-                <xsl:apply-templates select="@*"/>
+                <xsl:if test="not(@alt)">
+                    <xsl:attribute name="alt"/>
+                </xsl:if>
+                <xsl:apply-templates select="@*[name() != 'nolink']"/>
             </img>
         </xsl:otherwise>
     </xsl:choose>
