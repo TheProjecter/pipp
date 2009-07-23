@@ -17,6 +17,12 @@ import pipp_xslt
 
 threads = 10 # for checking external links
 
+dtd_defs = {
+    'strict': '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
+    'transitional': '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">',
+    'frameset': '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN" "http://www.w3.org/TR/html4/frameset.dtd">',
+}
+
 class SpellingMistake(Exception):
     def __init__(self, msg, filename, words):
         super(SpellingMistake, self).__init__(msg)
@@ -381,8 +387,11 @@ class PippFile(object):
 
         # Determine the output file name and write output to it
         abs_output_file = self.abs_out_path(self.abs_in_path(self.out_file))
+
+        dtdnode = self.state_node.xpath('exports/dtd')
+        dtd = dtdnode and Conversions.StringValue(dtdnode[0]) or 'strict'
         output_fh = open(abs_output_file, 'w')
-        output_fh.write('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">\n' + output)
+        output_fh.write(dtd_defs[dtd] + '\n' + output)
         output_fh.close()
 
         # Determine if any exported state was changed
