@@ -101,6 +101,9 @@
     <object class="wxMenuItem" name="3">
       <label>Full Rebuild</label>
     </object>
+    <object class="wxMenuItem" name="7">
+      <label>Show Errors</label>
+    </object>
     <object class="wxMenuItem" name="4">
       <label>Exit</label>
     </object>

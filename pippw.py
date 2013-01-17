@@ -1,6 +1,6 @@
 import wx, wx.xrc, sys, re, socket, os, threading, webbrowser, _winreg
 from wx.xrc import XRCCTRL
-import pipp
+import pipp, traceback
 
 prog_dir = hasattr(sys, 'frozen') and sys.executable or sys.argv[0]
 class Options(object):
@@ -10,10 +10,15 @@ class Options(object):
     listen = '127.0.0.1'
 options = Options()
 
+
 class PippTaskBarIcon(wx.TaskBarIcon):
     def __init__(self, *args, **kwargs):
         super(PippTaskBarIcon, self).__init__(*args, **kwargs)
-        self.SetIcon(wx.Icon('pipp.ico', wx.BITMAP_TYPE_ICO), 'Pipp')
+        self.pipp_icon = wx.Icon('pipp.ico', wx.BITMAP_TYPE_ICO)
+        self.pipp_working_icon = wx.Icon('pipp-working.ico', wx.BITMAP_TYPE_ICO)
+        self.pipp_error_icon = wx.Icon('pipp-error.ico', wx.BITMAP_TYPE_ICO)
+        self.SetIcon(self.pipp_icon, 'Pipp')
+        self.errlog = ''
 
     def CreatePopupMenu(self):
         menu = res.LoadMenu('popup_menu')
@@ -28,6 +33,7 @@ class PippTaskBarIcon(wx.TaskBarIcon):
         wx.EVT_MENU(menu, 4, self.exit)
         wx.EVT_MENU(menu, 5, self.explore)
         wx.EVT_MENU(menu, 6, self.links)
+        wx.EVT_MENU(menu, 7, self.errors)
         return menu
 
     def options(self, event):
@@ -37,7 +43,14 @@ class PippTaskBarIcon(wx.TaskBarIcon):
         webbrowser.open('http://%s:%d/index.html' % (options.listen, options.port))
 
     def rebuild(self, event):
-        server.project.build_full()
+        self.SetIcon(self.pipp_working_icon, 'Pipp - building...')
+        try:
+            server.project.build_full()
+            self.SetIcon(self.pipp_icon, 'Pipp')
+            self.errlog = ''
+        except Exception, e:
+            self.errlog = traceback.format_exc()
+            self.SetIcon(self.pipp_error_icon, 'Pipp - error')        
 
     def exit(self, event):
         self.RemoveIcon()
@@ -56,7 +69,12 @@ class PippTaskBarIcon(wx.TaskBarIcon):
                 f.write('<a href="%s">%s</a><br/>' % (l, l))
         f.close()
         webbrowser.open(tmp)
-
+    
+    def errors(self, event):
+        dlg = wx.MessageDialog(None, self.errlog, "Error information", wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
+   
 def browse_folders(event):
     tb = XRCCTRL(panel, 'path')
     dlg = wx.DirDialog(panel)
