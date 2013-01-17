@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=Pipp
-AppVerName=Pipp 2.0.2
+AppVerName=Pipp 2.0.3
 AppPublisher=Pajhome
 AppPublisherURL=http://pajhome.org.uk/web/pipp/
 AppSupportURL=http://pajhome.org.uk/web/pipp/
@@ -19,8 +19,8 @@ ChangesEnvironment=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "C:\paj\pipp\dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "C:\paj\pipp\example\*"; DestDir: "{app}\example"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\code\pipp\dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\code\pipp\example\*"; DestDir: "{app}\example"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Tasks]
