@@ -367,7 +367,8 @@ class PippFile(object):
             self.project.processor.extensionParams[(NAMESPACE, 'context')] = self
             output = self.project.processor.run(input)
 
-            if not self.state_node.xpath('exports/spell'):
+            # Spell checking currently disabled
+            if 0: # not self.state_node.xpath('exports/spell'):
                 # Check spelling
                 pin, pout = os.popen4('"c:/program files/aspell/bin/aspell" --master=british --home-dir=%s --mode=sgml --rem-sgml-check=alt list' % self.in_root)
                 try:
