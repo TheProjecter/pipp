@@ -23,7 +23,8 @@ def copytree(src, dst, skip):
         shutil.rmtree(dst)
     for dirpath, dirnames, filenames in os.walk(src):
         for s in skip:
-            dirnames.remove(s)
+            if s in dirnames:
+                dirnames.remove(s)
         dstpath = dst + dirpath[len(src):]
         if not os.path.isdir(dstpath):
             os.mkdir(dstpath)
