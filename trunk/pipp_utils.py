@@ -5,7 +5,7 @@
 import os, sys, shutil
 
 NAMESPACE   = 'http://pajhome.org.uk/web/pipp/xml-namespace'
-skip_copy   = ['.svn']
+skip_copy   = ['.svn', '.pip']
 pipp_dir    = os.path.abspath(os.path.dirname(sys.argv[0]))
 
 def get_text(node):
@@ -17,14 +17,24 @@ def get_text(node):
             rc = rc + text_node.data
     return rc
 
+
+def do_skip(l, skip):
+    todel = []
+    for s in skip:
+        for n in l:
+            if n.endswith(s):
+                todel.append(n)
+    for n in todel:
+        l.remove(n)
+    
+
 def copytree(src, dst, skip):
     "Copy a directory tree, excluding certain names"
     if os.path.exists(dst):
         shutil.rmtree(dst)
     for dirpath, dirnames, filenames in os.walk(src):
-        for s in skip:
-            if s in dirnames:
-                dirnames.remove(s)
+        do_skip(dirnames, skip)
+        do_skip(filenames, skip)
         dstpath = dst + dirpath[len(src):]
         if not os.path.isdir(dstpath):
             os.mkdir(dstpath)
